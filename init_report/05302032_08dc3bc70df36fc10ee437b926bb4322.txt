@@ -1,0 +1,8 @@
+examItem: 彩色多普勒超声常规检查（腹部）
+checkTime: 2025-09-17 12:01:58
+gender: 男
+age: 1岁1月
+finding: 腹部探查：
+   腹部肠管宽约2.8cm，蠕动差，肠壁厚约0.44cm。
+conclusion: 肠管略宽并蠕动差
+建议结合其他检查

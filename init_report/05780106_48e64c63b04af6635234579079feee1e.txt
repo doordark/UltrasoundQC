@@ -1,0 +1,6 @@
+examItem: 肝胆胰脾肾,彩色打印照片
+checkTime: 2024-04-24 11:00:00
+gender: 男
+age: 032Y
+finding: 1
+conclusion: 1

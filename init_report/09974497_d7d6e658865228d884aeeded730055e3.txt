@@ -1,0 +1,6 @@
+examItem: 
+checkTime: 2024-03-10 11:13:00
+gender: 女
+age: 1月12天
+finding: 颅内结构显示清晰。脑中线居中。脑室对称，无扩张。脑膜下及脑实质内未见异常回声区。
+conclusion: 颅内结构未见明显异常

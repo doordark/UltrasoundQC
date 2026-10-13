@@ -1,0 +1,6 @@
+examItem: 
+checkTime: 2024-01-02 09:50:00
+gender: 男
+age: 66岁
+finding: 嘱咐患者排尿后，测膀胱残余尿量约  0  ml。
+conclusion: 膀胱残余尿量约 0  ml

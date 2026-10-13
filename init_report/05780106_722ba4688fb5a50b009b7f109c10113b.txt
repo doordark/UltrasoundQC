@@ -1,0 +1,6 @@
+examItem: 胸水+定位
+checkTime: 2024-10-13 14:54:28
+gender: 女
+age: 064Y
+finding: 双侧胸腔扫查：双侧均探及少量液性暗区，左侧最大前后径2.1cm，右侧最大前后径3.0cm。
+conclusion: 双侧胸腔少量积液。

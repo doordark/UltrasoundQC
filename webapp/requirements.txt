@@ -1,0 +1,4 @@
+# 超声报告数据纠错系统 — 后端依赖（引擎 qc_engine.py 本身零依赖）
+fastapi>=0.110,<1.0
+uvicorn>=0.27,<1.0
+python-multipart>=0.0.9

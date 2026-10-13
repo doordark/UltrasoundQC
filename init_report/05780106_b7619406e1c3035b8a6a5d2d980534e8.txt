@@ -1,0 +1,6 @@
+examItem: 上肢或下肢软组织,彩色打印照片
+checkTime: 2024-05-29 11:44:29
+gender: 女
+age: 053Y
+finding: 左肘肿痛处扫查：未见明显异常团块回声。
+conclusion: 同上。

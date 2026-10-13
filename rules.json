@@ -1,0 +1,448 @@
+{
+  "meta": {
+    "version": "1.0",
+    "generated_at": "2026-10-06 18:15:38",
+    "source_file": "ultrasound_qc_report.xlsx",
+    "source_sheet": "错误明细表",
+    "total_rows": 1123,
+    "error_rows": 374,
+    "description": "超声报告离线质控规则库：由大模型批量质控结果提炼，供本地无大模型依赖的质控引擎使用"
+  },
+  "positive_keywords": [
+    {
+      "word": "结节",
+      "count": 140
+    },
+    {
+      "word": "低回声",
+      "count": 106
+    },
+    {
+      "word": "强回声",
+      "count": 94
+    },
+    {
+      "word": "血流信号",
+      "count": 48
+    },
+    {
+      "word": "钙化",
+      "count": 31
+    },
+    {
+      "word": "囊肿",
+      "count": 28
+    },
+    {
+      "word": "无回声",
+      "count": 27
+    },
+    {
+      "word": "暗区",
+      "count": 23
+    },
+    {
+      "word": "欠均匀",
+      "count": 23
+    },
+    {
+      "word": "增厚",
+      "count": 19
+    },
+    {
+      "word": "肿大",
+      "count": 19
+    },
+    {
+      "word": "扩张",
+      "count": 16
+    },
+    {
+      "word": "占位",
+      "count": 13
+    },
+    {
+      "word": "增大",
+      "count": 13
+    },
+    {
+      "word": "囊性暗区",
+      "count": 12
+    },
+    {
+      "word": "结石",
+      "count": 6
+    },
+    {
+      "word": "脂肪肝",
+      "count": 6
+    },
+    {
+      "word": "边界不清",
+      "count": 6
+    },
+    {
+      "word": "实性低回声",
+      "count": 5
+    },
+    {
+      "word": "包块",
+      "count": 4
+    },
+    {
+      "word": "小囊暗区",
+      "count": 4
+    },
+    {
+      "word": "回声暗区",
+      "count": 3
+    },
+    {
+      "word": "液性暗区",
+      "count": 3
+    },
+    {
+      "word": "条索状",
+      "count": 2
+    },
+    {
+      "word": "混合回声",
+      "count": 2
+    },
+    {
+      "word": "宫内暗区",
+      "count": 1
+    },
+    {
+      "word": "息肉",
+      "count": 1
+    },
+    {
+      "word": "积液",
+      "count": 1
+    },
+    {
+      "word": "斑块",
+      "count": 0
+    },
+    {
+      "word": "团块",
+      "count": 0
+    },
+    {
+      "word": "肌瘤",
+      "count": 0
+    }
+  ],
+  "side_keywords": [
+    {
+      "word": "左",
+      "count": 111
+    },
+    {
+      "word": "右",
+      "count": 94
+    },
+    {
+      "word": "右侧",
+      "count": 53
+    },
+    {
+      "word": "左侧",
+      "count": 48
+    },
+    {
+      "word": "双侧",
+      "count": 23
+    }
+  ],
+  "correction_mapping": {
+    "外上上限": "外上象限",
+    "玻璃体后脱位": "玻璃体后脱离",
+    "血流通常": "血流通畅",
+    "锯状缘": "锯齿缘",
+    "上上段": "上段",
+    "无法谈及": "无法探及",
+    "股径": "股骨长",
+    "回音": "回声",
+    "左侧乳房": "左乳"
+  },
+  "correction_details": [
+    {
+      "wrong": "外上上限",
+      "correct": "外上象限",
+      "count": 2,
+      "source": "excel"
+    },
+    {
+      "wrong": "玻璃体后脱位",
+      "correct": "玻璃体后脱离",
+      "count": 2,
+      "source": "excel"
+    },
+    {
+      "wrong": "血流通常",
+      "correct": "血流通畅",
+      "count": 2,
+      "source": "excel"
+    },
+    {
+      "wrong": "锯状缘",
+      "correct": "锯齿缘",
+      "count": 2,
+      "source": "excel"
+    },
+    {
+      "wrong": "上上段",
+      "correct": "上段",
+      "count": 1,
+      "source": "excel"
+    },
+    {
+      "wrong": "无法谈及",
+      "correct": "无法探及",
+      "count": 1,
+      "source": "excel"
+    },
+    {
+      "wrong": "股径",
+      "correct": "股骨长",
+      "count": 1,
+      "source": "excel"
+    },
+    {
+      "wrong": "回音",
+      "correct": "回声",
+      "count": 0,
+      "source": "seed"
+    },
+    {
+      "wrong": "左侧乳房",
+      "correct": "左乳",
+      "count": 0,
+      "source": "seed"
+    }
+  ],
+  "negative_conclusion_phrases": [
+    "未见明显异常",
+    "未见异常",
+    "无异常",
+    "未见明显局限性异常",
+    "双侧未见异常",
+    "无明显异常",
+    "未见占位",
+    "未见明确异常",
+    "结构未见明显异常"
+  ],
+  "gender_conflict": {
+    "male_organs": [
+      "前列腺",
+      "精囊",
+      "睾丸",
+      "附睾",
+      "阴囊",
+      "阴茎",
+      "输精管"
+    ],
+    "female_organs": [
+      "子宫",
+      "卵巢",
+      "附件",
+      "输卵管",
+      "宫颈",
+      "阴道",
+      "子宫内膜",
+      "胎盘",
+      "羊水",
+      "孕囊",
+      "胎儿",
+      "乳腺",
+      "乳房",
+      "副乳",
+      "前庭大腺"
+    ],
+    "exempt_keywords": [
+      "男性乳腺",
+      "男乳",
+      "男性乳房",
+      "两性畸形",
+      "假两性",
+      "变性"
+    ]
+  },
+  "exam_organ_map": {
+    "organ_aliases": {
+      "肝": ["肝", "肝脏"],
+      "胆": ["胆", "胆囊", "胆管"],
+      "胰": ["胰", "胰腺"],
+      "脾": ["脾", "脾脏"],
+      "肾": ["肾", "肾脏"],
+      "输尿管": ["输尿管"],
+      "膀胱": ["膀胱"],
+      "甲状腺": ["甲状腺"],
+      "乳腺": ["乳腺", "乳房", "乳"],
+      "子宫": ["子宫"],
+      "卵巢": ["卵巢"],
+      "附件": ["附件", "输卵管"],
+      "前列腺": ["前列腺"],
+      "心脏": ["心脏", "心房", "心室", "心肌", "左室", "右室", "左房", "右房"]
+    },
+    "exam_items": [
+      {"exam": ["肝胆胰脾", "肝胆脾胰"], "organs": ["肝", "胆", "胰", "脾"]},
+      {"exam": ["肝胆脾", "肝脾胆"], "organs": ["肝", "胆", "脾"]},
+      {"exam": ["肝胆胰", "肝胰胆"], "organs": ["肝", "胆", "胰"]},
+      {"exam": ["胰脾", "脾胰"], "organs": ["胰", "脾"]},
+      {"exam": ["肝胆"], "organs": ["肝", "胆"]},
+      {"exam": ["肾输尿管膀胱", "泌尿系", "泌尿系统", "双肾输尿管"], "organs": ["肾", "输尿管", "膀胱"]},
+      {"exam": ["肾输尿管", "双肾"], "organs": ["肾", "输尿管"]},
+      {"exam": ["子宫附件", "子宫双附件", "双侧附件", "子宫卵巢"], "organs": ["子宫", "附件"]}
+    ]
+  },
+  "logical_rules": [
+    {
+      "id": "LR001_finding_vs_conclusion",
+      "name": "阳性发现与阴性结论矛盾",
+      "type": "cross_section_contradiction",
+      "description": "所见/描述部分包含阳性病变敏感词，但结论部分出现阴性表述",
+      "applies_to": {
+        "source": "finding",
+        "target": "conclusion"
+      },
+      "condition": {
+        "source_any": "@positive_keywords",
+        "target_any": "@negative_conclusion_phrases"
+      },
+      "negative_conclusion_phrases": [
+        "未见明显异常",
+        "未见异常",
+        "无异常",
+        "未见明显局限性异常",
+        "双侧未见异常",
+        "无明显异常",
+        "未见占位",
+        "未见明确异常",
+        "结构未见明显异常"
+      ],
+      "severity": "high"
+    },
+    {
+      "id": "LR002_side_mismatch",
+      "name": "左右侧不匹配",
+      "type": "cross_section_contradiction",
+      "description": "所见与结论之间的左右侧表述冲突（如左侧病变结论写成右侧）",
+      "applies_to": {
+        "source": "finding",
+        "target": "conclusion"
+      },
+      "condition": {
+        "side_conflict": "@side_keywords"
+      },
+      "severity": "high"
+    },
+    {
+      "id": "LR003_nonstandard_wording",
+      "name": "错别字/不规范用词",
+      "type": "wording_check",
+      "description": "全文命中纠错映射中的误写词，应按映射替换为规范用词",
+      "applies_to": {
+        "source": "full_text"
+      },
+      "condition": {
+        "correction_mapping": "@correction_mapping"
+      },
+      "severity": "medium"
+    }
+  ],
+  "error_type_stats": [
+    {
+      "category": "描述与结论不一致",
+      "count": 175
+    },
+    {
+      "category": "语病或表述不规范",
+      "count": 52
+    },
+    {
+      "category": "分级不规范",
+      "count": 52
+    },
+    {
+      "category": "数据或单位错误",
+      "count": 45
+    },
+    {
+      "category": "错别字或字段缺失",
+      "count": 44
+    },
+    {
+      "category": "模板文字未删除",
+      "count": 2
+    },
+    {
+      "category": "遗漏检查部位",
+      "count": 2
+    },
+    {
+      "category": "其他",
+      "count": 1
+    },
+    {
+      "category": "性别年龄冲突",
+      "count": 1
+    }
+  ],
+  "extra_rules": [
+    {
+      "category": "数据或单位错误",
+      "count": 45,
+      "examples": [
+        {
+          "original_text": "双顶径：5.9cm（符合24w1d），头围：21.9cm（符合24w0d），\n腹围：18.7cm（符合23w4d），股骨长：4.3cm（符合24w1d），\n肱骨长：3.9cm（符合24w1d）。",
+          "suggestion": "核对各生物测量值及对应孕周，确保数据准确；结论孕周应基于综合评估或平均值，并说明依据。"
+        },
+        {
+          "original_text": "腹围：21.7cm（符合26w1d）",
+          "suggestion": "复核腹围测量值，确认是否为21.7cm或录入错误；若测量无误，应在报告中说明腹围偏大的可能原因或建议随访。"
+        },
+        {
+          "original_text": "内见大小约*cm低回声团，大小约3.9*3.6cm",
+          "suggestion": "删除未填写的“大小约*cm”，仅保留“大小约3.9*3.6cm”，或补充完整测量值并确保前后一致。"
+        }
+      ]
+    },
+    {
+      "category": "模板文字未删除",
+      "count": 2,
+      "examples": [
+        {
+          "original_text": "双侧腋窝探及肿大淋巴结回声，大小约2.8*1.0cm右侧，2.3*0.7cm左侧。\n双侧腋窝未见明显肿大淋巴结回声。",
+          "suggestion": "删除“双侧腋窝未见明显肿大淋巴结回声”这一冗余矛盾语句，保留与结论一致的描述。"
+        },
+        {
+          "original_text": "右侧颈总动脉分叉部处见一约xmm不均质低回声团块，形态规则，表面光滑。\n右侧颈总动脉分叉部处见几个不均质低回声团块，形态规则，表面光滑，测其一约7.0x2.0mm。",
+          "suggestion": "删除冗余描述，保留准确的“几个”团块描述。"
+        }
+      ]
+    },
+    {
+      "category": "其他",
+      "count": 1,
+      "examples": [
+        {
+          "original_text": "【检查项目】彩色多普勒超声常规检查（妇科）",
+          "suggestion": "将检查项目修改为与产科超声检查相符的项目名称，如“彩色多普勒超声常规检查（产科）”或“产前超声检查”。"
+        }
+      ]
+    },
+    {
+      "category": "性别年龄冲突",
+      "count": 1,
+      "examples": [
+        {
+          "original_text": "前列腺3.9*2.5*2.9cm，实质回声均匀，内未见明显异常回声。",
+          "suggestion": "建议核实患者年龄及前列腺测量数据，若测量无误应结合临床评估是否存在性早熟或前列腺病变，并在结论中如实描述前列腺大小异常。"
+        }
+      ]
+    }
+  ]
+}

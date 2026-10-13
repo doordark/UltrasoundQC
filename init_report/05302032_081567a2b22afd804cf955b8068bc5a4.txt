@@ -1,0 +1,6 @@
+examItem: 彩色多普勒超声常规检查(膀胱残余尿量测定)
+checkTime: 2025-09-18 16:09:48
+gender: 女
+age: 53岁
+finding: 排尿后，残余尿量：约15mL
+conclusion: 残余尿略多

@@ -1,0 +1,6 @@
+examItem: 
+checkTime: 2024-06-03 11:24:00
+gender: 男
+age: 58岁
+finding: 排尿后膀胱内未见残余尿无回声区。
+conclusion: 膀胱残余尿量阴性。

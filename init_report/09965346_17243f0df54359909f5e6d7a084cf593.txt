@@ -1,0 +1,6 @@
+examItem: 
+checkTime: 2024-01-29 18:08:00
+gender: 女
+age: 80岁
+finding: 坐位肋间扫查，见右侧肋膈隐窝内膈肌上方呈带状无回声区，较深处约0.7cm，透声尚好。
+conclusion: 右侧胸腔微量积液。

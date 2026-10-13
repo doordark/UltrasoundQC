@@ -1,0 +1,6 @@
+examItem: 
+checkTime: 2024-02-09 11:26:00
+gender: 男
+age: 12岁3月
+finding: 腹腔扫查：腹腔内见多个大小不等的淋巴结回声，较大一个约5.8*2.7 mm，边界清。CDFI：血流信息未见明显异常。
+conclusion: 腹腔内淋巴结探及

@@ -1,0 +1,6 @@
+examItem: 
+checkTime: 2024-03-27 12:59:00
+gender: 男
+age: 26岁
+finding: 双肾大小正常,形态正常，轮廓尚清晰，双肾内集合系统未见明显扩张。左肾内可见大小约5mm强回声。
+conclusion: 左肾结石

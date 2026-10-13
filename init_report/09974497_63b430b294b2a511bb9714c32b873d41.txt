@@ -1,0 +1,6 @@
+examItem: 
+checkTime: 2024-01-12 10:34:00
+gender: 女
+age: 13岁9月
+finding: 右侧大腿内侧皮下见多个低回声，边界清，测较大一约7*5mm，CDFI：内见丰富血流信号。
+conclusion: 右侧大腿内侧皮下多发低回声（血管瘤考虑）

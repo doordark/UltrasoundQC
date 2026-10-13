@@ -1,0 +1,6 @@
+examItem: 
+checkTime: 2024-03-05 10:37:00
+gender: 男
+age: 71岁
+finding: 左侧胸背部皮下脂肪层内可见大小约52*17mm的梭形中等回声，边界清，CDFI：未见明显血流信号。
+conclusion: 左侧胸背部皮下脂肪瘤考虑

@@ -1,0 +1,46 @@
+{
+  "id": "gender-organ",
+  "name": "性别与部位集（规则 G/H）",
+  "description": "4 份命中性别与检查项目冲突、所见遗漏检查部位的报告，演示工作站集成规范（标准 JSON 字段）下的硬性质控规则。",
+  "category": "典型错误",
+  "tags": ["G", "H"],
+  "expectation": "预期命中 G 类 3 条、H 类 2 条，共 5 条",
+  "reports": [
+    {
+      "report_id": "G001",
+      "exam_item": "子宫附件彩超",
+      "gender": "男",
+      "age": "58",
+      "finding": "子宫大小正常，肌层回声均匀，内膜居中。双侧附件区未见明显异常回声。",
+      "conclusion": "子宫附件未见明显异常。",
+      "expect_rules": ["G", "G"]
+    },
+    {
+      "report_id": "G002",
+      "exam_item": "前列腺彩超",
+      "gender": "女",
+      "age": "62",
+      "finding": "前列腺大小正常，形态规则，实质回声均匀。",
+      "conclusion": "前列腺未见明显异常。",
+      "expect_rules": ["G"]
+    },
+    {
+      "report_id": "H001",
+      "exam_item": "肝胆胰脾彩超",
+      "gender": "男",
+      "age": "50",
+      "finding": "肝脏形态大小正常，包膜光滑，实质回声均匀，血管纹理清晰。",
+      "conclusion": "肝脏未见明显异常。",
+      "expect_rules": ["H"]
+    },
+    {
+      "report_id": "H002",
+      "exam_item": "泌尿系彩超",
+      "gender": "女",
+      "age": "55",
+      "finding": "双肾形态大小正常，实质回声均匀，集合系统未见分离。",
+      "conclusion": "双肾未见明显异常。",
+      "expect_rules": ["H"]
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+examItem: 
+checkTime: 2024-03-13 16:44:00
+gender: 男
+age: 35岁
+finding: 左下肢内侧脂肪层内可见大小约35*10mm混合性，边界清，CDFI:未见明显血流信号。
+conclusion: 左下肢内侧脂肪层内混合性回声（血肿？）

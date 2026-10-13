@@ -1,0 +1,6 @@
+examItem: 彩色多普勒超声常规检查（腹部）
+checkTime: 2025-08-14 14:55:09
+gender: 女
+age: 2月17天
+finding: 下腹部探查：下腹部大量气体反射，未见明显器质性病变。
+conclusion: 下腹部胀气

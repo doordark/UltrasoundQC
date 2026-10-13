@@ -1,0 +1,6 @@
+examItem: 
+checkTime: 2024-03-20 16:02:00
+gender: 女
+age: 55岁
+finding: 右侧肘关节及右侧腋下扫查：未见明显异常回声及包块。
+conclusion: 右侧肘关节及右侧腋下未见明显异常

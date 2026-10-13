@@ -1,0 +1,28 @@
+# 超声报告数据纠错系统 — systemd 服务单元
+# 由 deploy.sh 渲染 @APP_DIR@ / @PORT@ / @SERVICE_USER@ 占位符后安装到
+# /etc/systemd/system/qc-web.service
+[Unit]
+Description=Ultrasound QC Web - 超声报告数据纠错系统
+After=network.target
+
+[Service]
+Type=simple
+User=@SERVICE_USER@
+Group=@SERVICE_USER@
+WorkingDirectory=@APP_DIR@
+EnvironmentFile=@APP_DIR@/.env
+ExecStart=@APP_DIR@/venv/bin/uvicorn backend.main:app --host 0.0.0.0 --port @PORT@ --workers 1
+Restart=always
+RestartSec=3
+StandardOutput=append:@APP_DIR@/logs/qc-web.log
+StandardError=append:@APP_DIR@/logs/qc-web.log
+
+# 资源与安全限制
+LimitNOFILE=65535
+MemoryMax=512M
+NoNewPrivileges=true
+ProtectSystem=full
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

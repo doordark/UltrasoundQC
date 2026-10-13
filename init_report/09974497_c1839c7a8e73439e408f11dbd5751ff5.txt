@@ -1,0 +1,6 @@
+examItem: 
+checkTime: 2024-02-19 12:00:00
+gender: 男
+age: 29岁
+finding: 临床所指右侧臀部包块处扫查：皮下可见范围约22*11mm无回声区，边界清，CDFI：未见明显血流信号。
+conclusion: 右侧臀部皮下无回声区（请结合临床）

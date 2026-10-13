@@ -1,0 +1,6 @@
+examItem: 
+checkTime: 2024-02-22 10:34:00
+gender: 男
+age: 12岁2月
+finding: 阑尾切除术后，右下腹区扫查：未见明显局限性异常回声。
+conclusion: 阑尾切除术后，右下腹区见明显局限性异常回声

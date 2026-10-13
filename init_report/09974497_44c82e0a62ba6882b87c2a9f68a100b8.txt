@@ -1,0 +1,6 @@
+examItem: 
+checkTime: 2024-03-15 10:38:00
+gender: 女
+age: 19岁
+finding: 右侧腮腺内见大小约24*11mm低回声，边界清，CDFI:未见明显血流信号。
+conclusion: 右侧腮腺内低回声块（混合瘤考虑）

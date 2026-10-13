@@ -1,0 +1,46 @@
+{
+  "id": "typical-errors",
+  "name": "典型错误集（规则 A/B/C/D）",
+  "description": "4 份分别命中结论遗漏病变、左右侧不符、用词勘误、分级冲突的典型错误报告，覆盖跨段逻辑类与书写规范类规则。",
+  "category": "典型错误",
+  "tags": ["A", "B", "C", "D"],
+  "expectation": "每份报告各命中 1 条问题，共 4 条",
+  "reports": [
+    {
+      "report_id": "T001",
+      "exam_item": "甲状腺彩超",
+      "gender": "女",
+      "age": "44",
+      "finding": "甲状腺右叶见一大小约1.2cm×0.9cm低回声结节，边界清，形态规则。",
+      "conclusion": "甲状腺未见明显异常。",
+      "expect_rules": ["A"]
+    },
+    {
+      "report_id": "T002",
+      "exam_item": "乳腺彩超",
+      "gender": "女",
+      "age": "38",
+      "finding": "左乳见一低回声结节，大小约0.8cm×0.6cm，边界清，形态规则。",
+      "conclusion": "右乳结节，考虑纤维腺瘤可能，建议随访。",
+      "expect_rules": ["B"]
+    },
+    {
+      "report_id": "T003",
+      "exam_item": "肝胆胰脾彩超",
+      "gender": "男",
+      "age": "55",
+      "finding": "肝内见一高回音结节，大小约1.0cm×0.8cm，边界清。胆囊壁光滑，腔内未见明显异常回声。胰腺形态正常，实质回声均匀。脾脏大小正常，实质回声均匀。",
+      "conclusion": "肝内高回声结节，考虑血管瘤。",
+      "expect_rules": ["C"]
+    },
+    {
+      "report_id": "T004",
+      "exam_item": "乳腺彩超",
+      "gender": "女",
+      "age": "47",
+      "finding": "右乳见一低回声结节，内见微钙化，边界不清，形态不规则。",
+      "conclusion": "右乳结节（BI-RADS 2类），建议随访。",
+      "expect_rules": ["D"]
+    }
+  ]
+}

@@ -1,0 +1,46 @@
+{
+  "id": "normal-clean",
+  "name": "正常报告集（零问题对照）",
+  "description": "4 份书写规范的阴性超声报告，用于验证引擎不误报：正常对照组应检出 0 条问题。",
+  "category": "基础演示",
+  "tags": ["对照组", "零误报"],
+  "expectation": "预期检出 0 条问题",
+  "reports": [
+    {
+      "report_id": "N001",
+      "exam_item": "肝胆胰脾彩超",
+      "gender": "男",
+      "age": "50",
+      "finding": "肝脏形态大小正常，包膜光滑，实质回声均匀，血管纹理清晰。胆囊壁光滑，腔内未见明显异常回声。胰腺形态正常，实质回声均匀。脾脏大小正常，实质回声均匀。",
+      "conclusion": "肝胆胰脾未见明显异常。",
+      "expect_rules": []
+    },
+    {
+      "report_id": "N002",
+      "exam_item": "甲状腺彩超",
+      "gender": "女",
+      "age": "35",
+      "finding": "甲状腺双侧叶大小正常，实质回声均匀，未见明显结节。CDFI：血流信号未见明显异常。",
+      "conclusion": "甲状腺未见明显异常。",
+      "expect_rules": []
+    },
+    {
+      "report_id": "N003",
+      "exam_item": "乳腺彩超",
+      "gender": "女",
+      "age": "42",
+      "finding": "双侧乳腺腺体层结构清晰，回声均匀，未见明显肿块。双侧腋窝未见明显肿大淋巴结。",
+      "conclusion": "双乳未见明显异常。",
+      "expect_rules": []
+    },
+    {
+      "report_id": "N004",
+      "exam_item": "心脏彩超",
+      "gender": "男",
+      "age": "61",
+      "finding": "各房室大小正常，室壁厚度正常，运动协调。各瓣膜形态、活动正常。心包腔未见明显积液。",
+      "conclusion": "心内结构及功能未见明显异常。",
+      "expect_rules": []
+    }
+  ]
+}

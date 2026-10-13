@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# PyInstaller 构建产物
+build/
+dist/
+*.exe
+
+# 打包/日志
+*.zip
+*.log
+
+# 生成的结果报告（保留 webapp/samples 下的样例 xlsx）
+/*.xlsx
+
+# 本地环境
+.env
+.venv/
+venv/

@@ -1,0 +1,6 @@
+examItem: 
+checkTime: 2024-08-17 10:42:00
+gender: 男
+age: 47岁
+finding: 腹股沟区未见明显占位性灶及无回声区。
+conclusion: 腹股沟区未见明显占位灶及液性暗区。

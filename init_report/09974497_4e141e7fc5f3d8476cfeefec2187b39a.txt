@@ -1,0 +1,6 @@
+examItem: 
+checkTime: 2024-01-23 13:34:00
+gender: 女
+age: 15岁
+finding: 右侧眉角皮下可见大小约22*7mm低回声，边界清，内回声尚均匀，CDFI:未见血流信号。
+conclusion: 右侧眉角皮下低回声（皮脂腺囊肿考虑，请结合临床）

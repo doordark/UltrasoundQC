@@ -1,0 +1,6 @@
+examItem: 彩色打印照片,胸腔（胸水）
+checkTime: 2024-08-13 08:00:00
+gender: 女
+age: 083Y
+finding: 双侧胸腔扫查：未见明显液性暗区。
+conclusion: 双侧胸腔未见明显积液。

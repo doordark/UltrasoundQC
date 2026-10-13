@@ -1,0 +1,6 @@
+examItem: 
+checkTime: 2024-01-07 17:24:00
+gender: 男
+age: 30岁
+finding: 双肾大小正常,形态正常，轮廓尚清晰，双肾内集合系统未见明显扩张。
+conclusion: 双肾未见明显异常

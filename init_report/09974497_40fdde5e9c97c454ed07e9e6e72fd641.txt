@@ -1,0 +1,6 @@
+examItem: 
+checkTime: 2024-01-08 12:35:00
+gender: 男
+age: 6岁2月
+finding: 双侧腹股沟区未见明显异常回声。
+conclusion: 双侧腹股沟区未见明显异常

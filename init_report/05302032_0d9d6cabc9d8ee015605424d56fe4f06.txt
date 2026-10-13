@@ -1,0 +1,6 @@
+examItem: 前列腺膀胱输尿管彩超(男)
+checkTime: 2025-01-13 09:57:28
+gender: 男
+age: 64岁
+finding: -
+conclusion: -

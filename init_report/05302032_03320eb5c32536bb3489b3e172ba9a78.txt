@@ -1,0 +1,6 @@
+examItem: 彩色多普勒超声常规检查（胃肠道）
+checkTime: 2025-10-09 09:51:21
+gender: 女
+age: 39岁
+finding: 患者肠管壁光滑，未见明显异常回声。
+conclusion: 未见明显异常回声
