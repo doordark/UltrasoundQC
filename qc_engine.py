@@ -48,7 +48,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from xml.sax.saxutils import escape
 
-ENGINE_VERSION = "1.2.3"
+ENGINE_VERSION = "1.2.4"
 MAX_BODY_BYTES = 8 * 1024 * 1024  # HTTP 请求体上限 8MB
 
 # ============================ 质控规则（9 类错误类型，名称不可改动） ============================
@@ -75,12 +75,13 @@ CHECK_ERROR_TYPE = {
     "C": ERR_TYPO_FIELD, "C2": ERR_TYPO_FIELD,
     "D": ERR_GRADING, "D1": ERR_GRADING, "D2": ERR_GRADING, "D3": ERR_GRADING, "D4": ERR_GRADING,
     "F2": ERR_WORDING, "F3": ERR_DATA_UNIT, "F4": ERR_OTHER,
-    "F5": ERR_WORDING, "F6": ERR_WORDING, "F7": ERR_WORDING,
-    "G": ERR_GENDER_AGE, "G2": ERR_GENDER_AGE,
+    "F5": ERR_WORDING, "F6": ERR_WORDING,
+    "G": ERR_GENDER_AGE, "G2": ERR_GENDER_AGE, "G3": ERR_GENDER_AGE,
     "H": ERR_MISSING_PART,
     "I": ERR_DATA_UNIT, "I1": ERR_DATA_UNIT, "I2": ERR_DATA_UNIT, "I3": ERR_DATA_UNIT,
-    "I4": ERR_DATA_UNIT, "I5": ERR_DATA_UNIT, "I6": ERR_DATA_UNIT,
+    "I4": ERR_DATA_UNIT, "I5": ERR_DATA_UNIT, "I6": ERR_DATA_UNIT, "I7": ERR_DATA_UNIT,
     "J1": ERR_WORDING, "J2": ERR_TEMPLATE_LEFT, "J3": ERR_TEMPLATE_LEFT,
+    "J4": ERR_TEMPLATE_LEFT,
 }
 
 # ============================ 内置默认规则（rules.json 缺失时兜底） ============================
@@ -117,9 +118,11 @@ DEFAULT_RULES = {
                           "胎盘", "羊水", "孕囊", "胎儿", "乳腺", "乳房", "副乳", "前庭大腺"],
         "exempt_keywords": ["男性乳腺", "男乳", "男性乳房", "两性畸形", "假两性", "变性"],
     },
-    # 规则 G2：年龄与检查内容逻辑冲突（如 79 岁女性产科胎儿检查，几乎不可能自然妊娠）
+    # 规则 G2/G3：年龄异常（如 79 岁女性产科胎儿检查，几乎不可能自然妊娠；
+    # 170 岁超出人类合理寿命上限，几乎为录入错误）
     "age_rules": {
         "pregnancy_max_age": 55,          # 超过该年龄出现妊娠相关描述即报年龄逻辑冲突
+        "max_age": 120,                   # 超过该年龄即报年龄超出合理范围（G3）
         "pregnancy_keywords": ["胎儿", "孕囊", "羊水", "胎盘", "脐动脉", "脐带", "宫内孕",
                                "早孕", "中孕", "晚孕", "单胎", "双胎", "胎心", "胎位",
                                "胎头", "胎腹", "股骨长", "双顶径", "头围", "腹围", "胎儿颈"],
@@ -151,6 +154,7 @@ DEFAULT_RULES = {
         "ratio_threshold": 6,             # 径线长短轴比例阈值（超过视为量纲异常）
         "min_largest_cm": 5,              # 量纲检查仅对最大径≥该值的测量值生效
         "min_smallest_cm": 1,             # 且短轴≥该值（扁平斑块长短轴悬殊属正常，排除防误报）
+        "min_lesion_mm": 1.0,             # mm 径线均小于该值视为不可测（如 0.13*0.1mm 应为 cm）
     },
     # 规则 J：语句重复/模板残留（阈值可按院内口径调整）
     "redundancy_rules": {
@@ -161,6 +165,21 @@ DEFAULT_RULES = {
     "stale_fragments": ["未了", "不完整", "未填", "未填写", "待补", "待填", "待查",
                         "此处填写", "见上", "同上", "？？", "??", "xx", "XX"],
     "stale_max_len": 8,                   # 括号内超过该长度的视为正常括注，不判残留
+    # 规则 J4：合法英文缩写白名单（小写比较）；白名单外的连续字母串（≥3 字母，如"ggun"）
+    # 判为乱码/无关残留文本。院内规范缩写可在此追加
+    "allowed_abbreviations": [
+        "cdfi", "doppler", "color", "flow", "imaging",
+        "birads", "rads", "tirads", "acr",
+        "psv", "edv", "esv", "vmax", "vmin",
+        "lvef", "gls", "tapse", "ivs", "ivsd", "ivsn", "lvpw", "lvpwd", "lvpwn",
+        "lvid", "lvidd", "lvidn", "lvdd", "lvds", "lad", "ivrt", "tdi", "dti",
+        "asd", "vsd", "pda",
+        "cca", "ica", "eca", "aca", "mca", "pca",
+        "bpd", "crl", "efw",
+        "mmhg", "bpm", "gfr", "egfr",
+        "psa", "tsh", "hcg", "afp", "cea",
+        "swe", "smi", "ceus", "tis", "normal",
+    ],
 }
 
 # 规则 A 否定识别：否定词须与阳性词同句（子句级判定，避免跨句误判）
@@ -221,10 +240,9 @@ NUM_UNIT_LOST_RE = re.compile(  # 疑似丢失乘号的小数粘连（"1.512cm" 
     r"(?<![\d.\-])\d\.\d{3,}\s*(?:cm|mm)(?![a-zA-Z])")
 PLACENTA_GRADE_RE = re.compile(r"(?:成熟度|功能)\s*[ⅠⅡⅢ0-3]\s*[+＋]\s*级")  # "Ⅱ+级"非Grannum写法
 
-# 规则 F5-F7 基础语病（标点/括号/句末）
+# 规则 F5-F6 基础语病（标点/括号）
 PUNCT_REPEAT_RE = re.compile(r"([。，；：、！])\1")          # 标点重复（"。。"、"，，"）
 EMPTY_BRACKET_RE = re.compile(r"[（(][\s]*[）)]")            # 空括号"（）"未填写内容
-SENT_END_OK_RE = re.compile(r"[。．.！？!?；;：:）)】\]】》>”\"\s]$")  # 正常句末标点/收尾
 # 规则 I6 测量范围倒置（"2.5-1.6cm" 疑似起止值颠倒，应为 1.6-2.5cm）
 RANGE_INVERT_RE = re.compile(r"(\d+(?:\.\d+)?)\s*[-‐–—~至]\s*(\d+(?:\.\d+)?)\s*(cm|mm)")
 
@@ -253,6 +271,8 @@ SITE_SIDE_PREFIX_RE = re.compile(r"^(双侧|左侧|右侧|左|右)")  # 比较�
 # 规则 J3 模板残留碎片：孤立括号残片（"(不完整，)"）与残缺标记提示
 STALE_PAREN_RE = re.compile(r"[（(]([^（）()\n]{1,12})[）)]")
 STALE_FRAG_HINT_RE = re.compile(r"(未|待|不|缺|补|填|写|\?|？|…|\.{2,}|[，,。；;：:]$)")
+# 规则 J4 无关字母串/乱码（"ggun"）：连续 3 个以上拉丁字母，白名单缩写除外
+LATIN_RUN_RE = re.compile(r"[A-Za-z]{3,}")
 
 # 规则 B 侧别-器官提取：侧别字(容许夹空格) + 后续 0~8 个汉字（后续再裁剪出器官名）
 SIDE_ORGAN_RE = re.compile(r"([左右双])\s*侧?\s*([\u4e00-\u9fa5]{0,8})")
@@ -494,6 +514,8 @@ def load_rules(rules_path) -> tuple[dict, str]:
         "redundancy_rules": {**DEFAULT_RULES["redundancy_rules"], **(raw.get("redundancy_rules") or {})},
         "stale_fragments": raw.get("stale_fragments") or DEFAULT_RULES["stale_fragments"],
         "stale_max_len": raw.get("stale_max_len") or DEFAULT_RULES["stale_max_len"],
+        "allowed_abbreviations": raw.get("allowed_abbreviations")
+                                 or DEFAULT_RULES["allowed_abbreviations"],
     }
     return rules, f"外部规则库 {Path(rules_path).name}"
 
@@ -1005,7 +1027,7 @@ def rule_f_completeness(parsed: dict, rules: dict) -> list:
                 "suggestion": "请核对测量数值并补充分隔（如 1.0 与 1.27 m/s）",
             })
 
-    # F5-F7 基础语病（标点重复 / 空括号 / 句末缺标点）
+    # F5-F6 基础语病（标点重复 / 空括号）
     for field, txt in (("finding", finding), ("conclusion", conclusion)):
         if not txt:
             continue
@@ -1022,14 +1044,6 @@ def rule_f_completeness(parsed: dict, rules: dict) -> list:
                 "field": field, "fragment": clip(txt[max(0, m.start() - 8):m.end() + 8]),
                 "message": f"空括号“{m.group(0)}”未填写内容",
                 "suggestion": "请填写括号内容或删除空括号",
-            })
-        body = txt.rstrip()
-        if body and not SENT_END_OK_RE.search(body):
-            issues.append({
-                "rule_id": "F", "check": "F7", "rule": "书写规范", "severity": "low",
-                "field": field, "fragment": clip(body[-16:]),
-                "message": f"{('超声所见' if field == 'finding' else '超声提示')}末尾缺少句末标点",
-                "suggestion": "请在段落末尾补全句号等标点",
             })
 
     # F4: 检查项目与内容不符（产科项目无胎儿内容 / 妇科项目出现胎儿内容）
@@ -1106,9 +1120,21 @@ def rule_g_age_conflict(parsed: dict, rules: dict) -> list:
     if not m:
         return []  # 年龄缺失/无法识别时跳过，不猜测
     age = int(m.group())
-    if age <= 0 or age > 120:
-        return []
     ar = rules.get("age_rules") or DEFAULT_RULES["age_rules"]
+    # G3 年龄超出合理生理范围（如 170 岁）：几乎必为录入错误，直接报出
+    max_plausible = int(ar.get("max_age", 120))
+    if age > max_plausible:
+        return [{
+            "rule_id": "G", "check": "G3", "rule": "性别年龄冲突", "severity": "high",
+            "field": "age",
+            "fragment": clip(f"age: {age_text}"),
+            "message": f"患者年龄 {age} 岁超出合理年龄范围（≤{max_plausible} 岁），"
+                       f"疑似年龄录入错误",
+            "suggestion": f"请核对并更正患者年龄录入（合理范围 0~{max_plausible} 岁），"
+                          "排除多录一位数或单位误填",
+        }]
+    if age <= 0:
+        return []
     max_age = int(ar.get("pregnancy_max_age", 55))
     if age < max_age:
         return []
@@ -1174,6 +1200,7 @@ def rule_i_measurement(parsed: dict, rules: dict) -> list:
     bad_units = set(mr.get("suspicious_units", ["m"]))
     ratio_th = float(mr.get("ratio_threshold", 6))
     min_largest = float(mr.get("min_largest_cm", 5))
+    min_lesion_mm = float(mr.get("min_lesion_mm", 1.0))
     issues = []
     seen_bad = set()
 
@@ -1255,14 +1282,33 @@ def rule_i_measurement(parsed: dict, rules: dict) -> list:
                 "message": f"测量范围“{m.group(0)}”起止值颠倒（{m.group(1)} 大于 {m.group(2)}）",
                 "suggestion": f"请按从小到大顺序书写测量范围（如 {m.group(2)}-{m.group(1)}{m.group(3)}）",
             })
+
+        # I7 mm 径线数值过小（"0.13*0.1mm" 均小于 1mm，低于超声可测范围，疑似单位应为 cm）
+        for m in DIM_MEASURE_RE.finditer(text):
+            unit = (m.group(3) or "").lower()
+            if unit != "mm":
+                continue
+            num_part = m.group(0)[:-len(m.group(3) or "")]
+            vals = [float(v) for v in re.findall(r"\d+(?:\.\d+)?", num_part)]
+            if len(vals) < 2 or max(vals) >= min_lesion_mm:
+                continue
+            issues.append({
+                "rule_id": "I", "check": "I7", "rule": "数据与单位异常", "severity": "high",
+                "field": field, "fragment": clip(m.group(0)),
+                "message": f"测量值“{m.group(0)}”径线均小于 {min_lesion_mm:g}mm，"
+                           f"低于超声可测范围，疑似单位误录（应为 cm）",
+                "suggestion": f"请核对测量单位：此类小数径线通常以 cm 记录（如 {num_part}cm）",
+            })
     return issues
 
 
 def rule_j_redundancy(parsed: dict, rules: dict) -> list:
-    """规则 J【语句重复】：叠词重复（"大小大小"）/ 整句模板重复冗余。"""
+    """规则 J【语句重复】：叠词重复（"大小大小"）/ 整句模板重复冗余 / 乱码残留。"""
     rr = rules.get("redundancy_rules") or DEFAULT_RULES["redundancy_rules"]
     sim_th = float(rr.get("similarity_threshold", 0.78))
     min_len = int(rr.get("min_sentence_len", 10))
+    allowed_abbr = {w.lower() for w in
+                    (rules.get("allowed_abbreviations") or DEFAULT_RULES["allowed_abbreviations"]) if w}
     issues = []
 
     for field in ("finding", "conclusion"):
@@ -1384,6 +1430,19 @@ def rule_j_redundancy(parsed: dict, rules: dict) -> list:
                     "suggestion": f"请核对并删除残留字词“{w}”（模板未删干净或未填写完整）",
                 })
                 break
+
+        # J4 无关字母串/乱码（"ggun"）：白名单外的连续字母串疑似误输入或垃圾文本
+        for m in LATIN_RUN_RE.finditer(text):
+            run = m.group(0)
+            if run.lower() in allowed_abbr:
+                continue
+            issues.append({
+                "rule_id": "J", "check": "J4", "rule": "语句重复", "severity": "medium",
+                "field": field, "fragment": clip(text[max(0, m.start() - 6):m.end() + 6]),
+                "message": f"检出无关字母串“{run}”，疑似乱码、误输入或未删除的占位文本",
+                "suggestion": f"请核对并删除无关字母串“{run}”"
+                              "（若属院内规范缩写，可加入 rules.json 的 allowed_abbreviations 白名单）",
+            })
     return issues
 
 
@@ -1821,10 +1880,10 @@ _SELFTEST_CASES = [
         "expect_rules": {"语病或表述不规范"},
     },
     {
-        "name": "用例23-所见末缺句末标点(F7)→语病或表述不规范",
+        "name": "用例23-段末缺句末标点不报(移除回归)",
         "text": ("检查项目：甲状腺超声\n性别：女 年龄：45岁\n"
                  "超声所见：甲状腺右叶见低回声结节，边界清晰\n超声提示：甲状腺右叶结节。\n"),
-        "expect_rules": {"语病或表述不规范"},
+        "expect_rules": set(),
     },
     {
         "name": "用例24-测量范围倒置(I6)→数据或单位错误",
@@ -1843,6 +1902,33 @@ _SELFTEST_CASES = [
         "text": ("检查项目：甲状腺超声\n性别：女 年龄：45岁\n"
                  "超声所见：甲状腺右叶低回声结节（考虑良性，建议定期复查），边界清晰。\n"
                  "超声提示：甲状腺右叶结节（C-TIRADS 3类）。\n"),
+        "expect_rules": set(),
+    },
+    {
+        "name": "用例27-年龄超合理范围170岁(G3)→性别年龄冲突",
+        "text": ("检查项目：颈动脉彩超\n性别：男 年龄：170岁\n"
+                 "超声所见：双侧颈总动脉内径正常，内中膜不增厚。\n超声提示：双侧颈动脉未见明显异常。\n"),
+        "expect_rules": {"性别年龄冲突"},
+    },
+    {
+        "name": "用例28-mm径线数值过小(I7)→数据或单位错误",
+        "text": ("检查项目：颈动脉彩超\n性别：男 年龄：65岁\n"
+                 "超声所见：左侧颈动脉分叉处见大小约0.13*0.1mm高回声扁平斑块，CDFI：血流未见异常。\n"
+                 "超声提示：左侧颈动脉斑块。\n"),
+        "expect_rules": {"数据或单位错误"},
+    },
+    {
+        "name": "用例29-无关字母串乱码(J4)→模板文字未删除",
+        "text": ("检查项目：颈动脉彩超\n性别：男 年龄：65岁\n"
+                 "超声所见：左侧颈总动脉内中膜不均增厚，ggun管腔分叉处见斑块。\n"
+                 "超声提示：左侧颈动脉内中膜增厚伴斑块。\n"),
+        "expect_rules": {"模板文字未删除"},
+    },
+    {
+        "name": "用例30-正常缩写与小数mm内膜厚度不误报(误报回归)",
+        "text": ("检查项目：颈动脉彩超\n性别：男 年龄：65岁\n"
+                 "超声所见：双侧颈总动脉（CCA、ICA、ECA）内中膜厚度约0.6mm，CDFI：血流频谱形态正常。"
+                 "右侧颈内动脉见斑块，大小约2.5*1.6mm。\n超声提示：右侧颈内动脉斑块。\n"),
         "expect_rules": set(),
     },
 ]
