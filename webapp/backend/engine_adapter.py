@@ -3,7 +3,7 @@
 引擎为纯 Python 标准库实现（仓库根目录 qc_engine.py），本模块负责：
 1. 定位并导入 qc_engine（支持 QC_ENGINE_FILE 环境变量指定路径）；
 2. 加载规则库 rules.json（支持 QC_RULES_FILE 环境变量指定路径，缺失时用内置规则）；
-3. 提供 run_batch()：对标准 JSON 报告列表批量执行 A~H 质控规则并汇总统计。
+3. 提供 run_batch()：对标准 JSON 报告列表批量执行 A~J 质控规则并汇总统计。
 """
 from __future__ import annotations
 
@@ -81,6 +81,8 @@ def normalize_report(obj) -> dict | None:
     }
     if not report["finding"] and not report["conclusion"]:
         return None
+    if obj.get("source_file"):
+        report["source_file"] = str(obj["source_file"])
     return report
 
 
@@ -98,7 +100,7 @@ def run_batch(reports: list[dict], start_index: int = 0) -> dict:
     """批量质检并汇总：reports 为标准五字段结构列表。"""
     t0 = time.perf_counter()
     results = []
-    by_rule: dict = {}
+    by_error_type: dict = {}
     by_severity: dict = {}
     issue_total = 0
     reports_with_issues = 0
@@ -110,12 +112,14 @@ def run_batch(reports: list[dict], start_index: int = 0) -> dict:
         if issues:
             reports_with_issues += 1
         for it in issues:
-            by_rule[it["rule_id"]] = by_rule.get(it["rule_id"], 0) + 1
+            et = it.get("error_type") or "其他"
+            by_error_type[et] = by_error_type.get(et, 0) + 1
             by_severity[it["severity"]] = by_severity.get(it["severity"], 0) + 1
         results.append({
             "index": start_index + offset,
             "report_id": rep.get("report_id") or f"R{start_index + offset + 1:03d}",
-            "report": {k: rep.get(k, "") for k in ("exam_item", "gender", "age", "finding", "conclusion")},
+            "report": {k: rep.get(k, "") for k in ("exam_item", "gender", "age", "finding", "conclusion")}
+            | ({"source_file": rep["source_file"]} if rep.get("source_file") else {}),
             "parse_notes": res["parsed"].get("parse_notes", []),
             "issues": issues,
             "issue_count": len(issues),
@@ -131,7 +135,10 @@ def run_batch(reports: list[dict], start_index: int = 0) -> dict:
             "reports_with_issues": reports_with_issues,
             "issue_total": issue_total,
             "elapsed_ms": elapsed,
-            "by_rule": dict(sorted(by_rule.items())),
+            "by_error_type": {
+                et: by_error_type.get(et, 0) for et in engine.ERROR_TYPE_ORDER
+                if by_error_type.get(et, 0)
+            },
             "by_severity": by_severity,
         },
         "results": results,

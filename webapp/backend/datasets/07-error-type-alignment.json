@@ -1,0 +1,129 @@
+{
+  "id": "error-type-alignment",
+  "name": "错误类型对齐集（9 类全覆盖）",
+  "description": "9 份报告逐一命中一类错误类型（名称与质控 Excel「错误类型」列完全一致），验证错误分类规则与测试网站功能完全对齐：描述与结论不一致、分级不规范、语病或表述不规范、数据或单位错误、错别字或字段缺失、模板文字未删除、遗漏检查部位、其他、性别年龄冲突。",
+  "category": "规则对齐",
+  "tags": [
+    "A",
+    "B",
+    "C",
+    "D",
+    "E",
+    "F",
+    "G",
+    "H",
+    "I",
+    "J"
+  ],
+  "expectation": "每份报告命中 1 条问题，9 份覆盖 9 类错误类型",
+  "reports": [
+    {
+      "report_id": "T001",
+      "exam_item": "甲状腺彩超",
+      "gender": "女",
+      "age": "45",
+      "finding": "甲状腺右叶见一低回声结节，大小约2.5*1.6cm，边界清晰。",
+      "conclusion": "甲状腺未见异常。",
+      "expect_rules": [
+        "描述与结论不一致"
+      ],
+      "expect_error_type": "描述与结论不一致"
+    },
+    {
+      "report_id": "T002",
+      "exam_item": "甲状腺彩超",
+      "gender": "女",
+      "age": "45",
+      "finding": "甲状腺右叶见一低回声结节，边界清晰。",
+      "conclusion": "甲状腺右叶结节（C-TIRADS 3级）。",
+      "expect_rules": [
+        "分级不规范"
+      ],
+      "expect_error_type": "分级不规范"
+    },
+    {
+      "report_id": "T003",
+      "exam_item": "甲状腺彩超",
+      "gender": "女",
+      "age": "45",
+      "finding": "甲状腺右叶见低回声结节，大小大小约2.5*1.6cm，边界清晰。",
+      "conclusion": "甲状腺右叶结节。",
+      "expect_rules": [
+        "语病或表述不规范"
+      ],
+      "expect_error_type": "语病或表述不规范"
+    },
+    {
+      "report_id": "T004",
+      "exam_item": "甲状腺彩超",
+      "gender": "女",
+      "age": "45",
+      "finding": "甲状腺右叶见低回声结节，大小约2.5*1.6m，边界清晰。",
+      "conclusion": "甲状腺右叶结节。",
+      "expect_rules": [
+        "数据或单位错误"
+      ],
+      "expect_error_type": "数据或单位错误"
+    },
+    {
+      "report_id": "T005",
+      "exam_item": "肝脏彩超",
+      "gender": "男",
+      "age": "45",
+      "finding": "肝脏大小形态正常，实质回声均匀。",
+      "conclusion": "肝内见多个回音团。",
+      "expect_rules": [
+        "错别字或字段缺失"
+      ],
+      "expect_error_type": "错别字或字段缺失"
+    },
+    {
+      "report_id": "T006",
+      "exam_item": "乳腺彩超",
+      "gender": "女",
+      "age": "50",
+      "finding": "双侧腋窝探及肿大淋巴结回声，大小约2.8*1.0cm。双侧腋窝未见明显肿大淋巴结回声。",
+      "conclusion": "双侧腋窝肿大淋巴结回声。",
+      "expect_rules": [
+        "模板文字未删除"
+      ],
+      "expect_error_type": "模板文字未删除"
+    },
+    {
+      "report_id": "T007",
+      "exam_item": "肝胆胰脾彩超",
+      "gender": "男",
+      "age": "45",
+      "finding": "肝脏形态正常，实质回声均匀。",
+      "conclusion": "肝脏未见明显异常。",
+      "expect_rules": [
+        "遗漏检查部位"
+      ],
+      "expect_error_type": "遗漏检查部位"
+    },
+    {
+      "report_id": "T008",
+      "exam_item": "彩色多普勒超声常规检查（妇科）",
+      "gender": "女",
+      "age": "30",
+      "finding": "宫内见一孕囊，大小约2.0*1.5cm，可见卵黄囊。",
+      "conclusion": "早孕。",
+      "expect_rules": [
+        "其他"
+      ],
+      "expect_error_type": "其他"
+    },
+    {
+      "report_id": "T009",
+      "exam_item": "甲状腺彩超",
+      "gender": "男",
+      "age": "35",
+      "finding": "甲状腺右叶见一低回声结节，大小约1.5*1.2cm，边界清晰。",
+      "conclusion": "子宫肌瘤。",
+      "expect_rules": [
+        "性别年龄冲突"
+      ],
+      "expect_error_type": "性别年龄冲突"
+    }
+  ]
+}

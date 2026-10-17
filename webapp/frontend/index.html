@@ -1,174 +1,328 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>超声报告数据纠错系统</title>
-  <link rel="stylesheet" href="assets/styles.css">
-</head>
-<body>
-  <header class="site-header">
-    <div class="brand">
-      <div class="brand-logo">QC</div>
-      <div>
-        <h1>超声报告数据纠错系统</h1>
-        <p class="brand-sub">离线超声报告质控引擎 · A~H 八类规则 · 上传即检 · 免上传演示</p>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>超声报告数据纠错系统</title>
+    <link rel="stylesheet" href="assets/styles.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="brand">
+        <div class="brand-logo">QC</div>
+        <div>
+          <h1>超声报告数据纠错系统</h1>
+          <p class="brand-sub">
+            离线超声报告质控引擎 · 9 类质控规则 · 上传即检 · 免上传演示
+          </p>
+        </div>
       </div>
-    </div>
-    <div class="header-status">
-      <span id="healthPill" class="pill pill-warn"><span class="dot"></span><span id="healthText">服务检测中…</span></span>
-      <span id="engineVersion" class="pill pill-plain">引擎版本 --</span>
-    </div>
-  </header>
+      <div class="header-status">
+        <span id="healthPill" class="pill pill-warn"
+          ><span class="dot"></span
+          ><span id="healthText">服务检测中…</span></span
+        >
+        <span id="engineVersion" class="pill pill-plain">引擎版本 --</span>
+      </div>
+    </header>
 
-  <nav class="tab-nav">
-    <button class="tab-btn active" data-tab="upload">上传纠错</button>
-    <button class="tab-btn" data-tab="datasets">测试数据集</button>
-    <button class="tab-btn" data-tab="help">帮助与接口</button>
-  </nav>
+    <nav class="tab-nav">
+      <button class="tab-btn active" data-tab="upload">上传纠错</button>
+      <button class="tab-btn" data-tab="datasets">测试数据集</button>
+      <button class="tab-btn" data-tab="help">帮助与接口</button>
+    </nav>
 
-  <main class="container">
-
-    <!-- ================= 上传纠错 ================= -->
-    <section id="tab-upload" class="tab-panel active">
-      <div class="card">
-        <h2><span class="step-no">1</span>上传数据文件</h2>
-        <div id="dropzone" class="dropzone" tabindex="0">
-          <input type="file" id="fileInput" hidden accept=".txt,.md,.json,.csv,.tsv,.xlsx">
-          <div class="dz-icon">
-            <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.6">
-              <path d="M12 16V4m0 0L7 9m5-5 5 5" stroke-linecap="round" stroke-linejoin="round"/>
-              <path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" stroke-linecap="round"/>
-            </svg>
+    <main class="container">
+      <!-- ================= 上传纠错 ================= -->
+      <section id="tab-upload" class="tab-panel active">
+        <div class="card">
+          <h2><span class="step-no">1</span>上传数据文件</h2>
+          <div id="dropzone" class="dropzone" tabindex="0">
+            <input
+              type="file"
+              id="fileInput"
+              hidden
+              multiple
+              accept=".txt,.md,.json,.csv,.tsv,.xlsx"
+            />
+            <div class="dz-icon">
+              <svg
+                viewBox="0 0 24 24"
+                width="40"
+                height="40"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+              >
+                <path
+                  d="M12 16V4m0 0L7 9m5-5 5 5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+                <path
+                  d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"
+                  stroke-linecap="round"
+                />
+              </svg>
+            </div>
+            <p class="dz-title">点击选择文件，或将文件拖拽到此处</p>
+            <p class="dz-sub">
+              支持
+              <b>.txt / .md / .json / .csv / .tsv / .xlsx</b>，可一次选择/拖拽
+              <b>多个文件</b>（最多 20 个），单文件最大 20MB
+            </p>
+            <p class="dz-sub dim">
+              不确定格式？<a href="samples/sample_reports.json" download
+                >JSON 样例</a
+              >
+              · <a href="samples/sample_reports.csv" download>CSV 样例</a> ·
+              <a href="samples/sample_reports.txt" download>TXT 样例</a> ·
+              <a href="samples/sample_reports.xlsx" download>XLSX 样例</a>
+            </p>
           </div>
-          <p class="dz-title">点击选择文件，或将文件拖拽到此处</p>
-          <p class="dz-sub">支持 <b>.txt / .md / .json / .csv / .tsv / .xlsx</b>，单文件最大 20MB</p>
-          <p class="dz-sub dim">不确定格式？<a href="samples/sample_reports.json" download>JSON 样例</a> ·
-            <a href="samples/sample_reports.csv" download>CSV 样例</a> ·
-            <a href="samples/sample_reports.txt" download>TXT 样例</a> ·
-            <a href="samples/sample_reports.xlsx" download>XLSX 样例</a></p>
+          <div id="fileInfo" class="file-info hidden"></div>
+          <div id="uploadWarn" class="warn-box hidden"></div>
         </div>
-        <div id="fileInfo" class="file-info hidden"></div>
-        <div id="uploadWarn" class="warn-box hidden"></div>
-      </div>
 
-      <div class="card hidden" id="previewCard">
-        <h2><span class="step-no">2</span>解析结果预览 <span class="h-sub" id="previewCount"></span></h2>
-        <div class="table-wrap">
-          <table class="data-table" id="previewTable">
-            <thead>
-              <tr>
-                <th>报告ID</th><th>检查项目</th><th>性别</th><th>年龄</th>
-                <th>超声所见</th><th>超声提示</th>
-              </tr>
-            </thead>
-            <tbody></tbody>
-          </table>
+        <div class="card hidden" id="previewCard">
+          <h2>
+            <span class="step-no">2</span>解析结果预览
+            <span class="h-sub" id="previewCount"></span>
+          </h2>
+          <div class="table-wrap">
+            <table class="data-table" id="previewTable">
+              <thead>
+                <tr>
+                  <th>报告ID</th>
+                  <th>来源文件</th>
+                  <th>检查项目</th>
+                  <th>性别</th>
+                  <th>年龄</th>
+                  <th>超声所见</th>
+                  <th>超声提示</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
         </div>
-      </div>
 
-      <div class="card">
-        <h2><span class="step-no">3</span>一键纠错</h2>
-        <div id="uploadStepper" class="stepper"></div>
-        <div class="btn-row">
-          <button id="runUploadBtn" class="btn-primary" disabled>开始纠错</button>
-          <button id="resetUploadBtn" class="btn-ghost">重新上传</button>
+        <div class="card">
+          <h2><span class="step-no">3</span>一键纠错</h2>
+          <div id="uploadStepper" class="stepper"></div>
+          <div class="btn-row">
+            <button id="runUploadBtn" class="btn-primary" disabled>
+              开始纠错
+            </button>
+            <button id="resetUploadBtn" class="btn-ghost">重新上传</button>
+          </div>
+          <p class="hint" id="uploadHint">
+            请先上传数据文件，解析成功后即可执行纠错。
+          </p>
         </div>
-        <p class="hint" id="uploadHint">请先上传数据文件，解析成功后即可执行纠错。</p>
-      </div>
 
-      <div id="uploadResult"></div>
-    </section>
+        <div id="uploadResult"></div>
+      </section>
 
-    <!-- ================= 测试数据集 ================= -->
-    <section id="tab-datasets" class="tab-panel">
-      <div class="card">
-        <h2>预置标准测试数据集</h2>
-        <p class="section-desc">无需上传文件，选择任一数据集即可一键执行纠错，快速体验与演示系统效果。所有数据均为脱敏构造的超声报告样例。</p>
-        <div id="datasetGrid" class="dataset-grid"></div>
-      </div>
-
-      <div class="card">
-        <h2>纠错执行状态</h2>
-        <div id="datasetStepper" class="stepper"></div>
-        <p class="hint" id="datasetHint">选择上方任一数据集，点击「一键纠错」开始。</p>
-      </div>
-
-      <div id="datasetResult"></div>
-    </section>
-
-    <!-- ================= 帮助与接口 ================= -->
-    <section id="tab-help" class="tab-panel">
-      <div class="card">
-        <h2>上传文件格式说明</h2>
-        <div class="table-wrap">
-          <table class="data-table">
-            <thead><tr><th>格式</th><th>说明</th></tr></thead>
-            <tbody>
-              <tr><td><b>JSON</b></td><td>单个报告对象、对象数组，或 <code>{"reports": [...]}</code> 包装。字段：<code>exam_item / gender / age / finding / conclusion</code>（兼容中文键名 检查项目/性别/年龄/超声所见/超声提示）。</td></tr>
-              <tr><td><b>CSV / TSV</b></td><td>首行为表头，列名使用上述字段名或中文键名即可自动映射；每行一份报告。</td></tr>
-              <tr><td><b>XLSX</b></td><td>Excel/WPS 工作表，首行为表头（列名同 CSV），仅解析第一个工作表。</td></tr>
-              <tr><td><b>TXT / MD</b></td><td>多份报告按分隔行（如 <code>----------</code>）或空行分隔；每份报告内使用「检查项目：」「超声所见：」「超声提示：」等标签行，无标签时全文按超声所见处理。</td></tr>
-            </tbody>
-          </table>
+      <!-- ================= 测试数据集 ================= -->
+      <section id="tab-datasets" class="tab-panel">
+        <div class="card">
+          <h2>预置标准测试数据集</h2>
+          <p class="section-desc">
+            无需上传文件，选择任一数据集即可一键执行纠错，快速体验与演示系统效果。所有数据均为脱敏构造的超声报告样例。
+          </p>
+          <div id="datasetGrid" class="dataset-grid"></div>
         </div>
-      </div>
 
-      <div class="card">
-        <h2>测试用例使用方法</h2>
-        <ol class="doc-list">
-          <li><b>免上传演示：</b>切换到「测试数据集」页签 → 选择数据集 → 点击「一键纠错」，即可查看该数据集的完整纠错结果与问题定位。</li>
-          <li><b>上传演示：</b>在「上传纠错」页签下载页面顶部的样例文件（JSON/CSV/TXT/XLSX 任一）→ 上传 → 预览解析结果 → 点击「开始纠错」。</li>
-          <li><b>预期效果：</b>「正常报告集」应检出 0 条问题（零误报对照）；其余数据集的预期命中规则见数据集卡片上的说明。</li>
-          <li><b>结果导出：</b>纠错完成后点击结果区的「导出纠错结果（Excel）」按钮，即可下载含「质控概览 + 错误明细」两个 Sheet 的 Excel 文件。</li>
-        </ol>
-      </div>
-
-      <div class="card">
-        <h2>HTTP 接口说明</h2>
-        <div class="table-wrap">
-          <table class="data-table">
-            <thead><tr><th>方法</th><th>路径</th><th>说明</th></tr></thead>
-            <tbody>
-              <tr><td>GET</td><td><code>/api/health</code></td><td>服务状态、引擎版本、规则来源探针</td></tr>
-              <tr><td>GET</td><td><code>/api/rules</code></td><td>查看当前生效的规则库</td></tr>
-              <tr><td>GET</td><td><code>/api/datasets</code></td><td>预置测试数据集列表</td></tr>
-              <tr><td>GET</td><td><code>/api/datasets/{id}</code></td><td>数据集详情（含报告列表）</td></tr>
-              <tr><td>POST</td><td><code>/api/datasets/{id}/check</code></td><td>对预置数据集一键纠错</td></tr>
-              <tr><td>POST</td><td><code>/api/check</code></td><td>单份报告纠错（标准 JSON 报告对象）</td></tr>
-              <tr><td>POST</td><td><code>/api/check/batch</code></td><td>批量纠错：<code>{"reports": [...]}</code></td></tr>
-              <tr><td>POST</td><td><code>/api/export</code></td><td>导出纠错结果为 Excel（质控概览 + 错误明细）</td></tr>
-              <tr><td>POST</td><td><code>/api/upload</code></td><td>上传并解析文件（不纠错，供预览）</td></tr>
-              <tr><td>POST</td><td><code>/api/upload/check</code></td><td>上传 → 解析 → 纠错，单请求返回完整结果</td></tr>
-            </tbody>
-          </table>
+        <div class="card">
+          <h2>纠错执行状态</h2>
+          <div id="datasetStepper" class="stepper"></div>
+          <p class="hint" id="datasetHint">
+            选择上方任一数据集，点击「一键纠错」开始。
+          </p>
         </div>
-        <p class="hint">完整接口文档（请求/响应示例、curl 调用）见部署包内 <code>README.md</code>；亦可访问 <code>/docs</code> 查看自动生成的交互式 API 文档。</p>
-      </div>
 
-      <div class="card">
-        <h2>质控规则速览（A~H）</h2>
-        <div class="rule-grid" id="ruleGrid"></div>
-      </div>
-    </section>
-  </main>
+        <div id="datasetResult"></div>
+      </section>
 
-  <footer class="site-footer">
-    <span>超声报告数据纠错系统 · 基于离线质控引擎（纯 Python 标准库，零外网依赖）</span>
-  </footer>
+      <!-- ================= 帮助与接口 ================= -->
+      <section id="tab-help" class="tab-panel">
+        <div class="card">
+          <h2>上传文件格式说明</h2>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>格式</th>
+                  <th>说明</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><b>JSON</b></td>
+                  <td>
+                    单个报告对象、对象数组，或
+                    <code>{"reports": [...]}</code> 包装。字段：<code
+                      >exam_item / gender / age / finding / conclusion</code
+                    >（兼容中文键名 检查项目/性别/年龄/超声所见/超声提示）。
+                  </td>
+                </tr>
+                <tr>
+                  <td><b>CSV / TSV</b></td>
+                  <td>
+                    首行为表头，列名使用上述字段名或中文键名即可自动映射；每行一份报告。
+                  </td>
+                </tr>
+                <tr>
+                  <td><b>XLSX</b></td>
+                  <td>
+                    Excel/WPS 工作表，首行为表头（列名同
+                    CSV），仅解析第一个工作表。
+                  </td>
+                </tr>
+                <tr>
+                  <td><b>TXT / MD</b></td>
+                  <td>
+                    多份报告按分隔行（如
+                    <code>----------</code
+                    >）或空行分隔；每份报告内使用「检查项目：」「超声所见：」「超声提示：」等标签行，无标签时全文按超声所见处理。
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
 
-  <!-- 弹窗 -->
-  <div id="modalMask" class="modal-mask hidden">
-    <div class="modal">
-      <div class="modal-head">
-        <h3 id="modalTitle">详情</h3>
-        <button id="modalClose" class="modal-close" aria-label="关闭">×</button>
+        <div class="card">
+          <h2>测试用例使用方法</h2>
+          <ol class="doc-list">
+            <li>
+              <b>免上传演示：</b>切换到「测试数据集」页签 → 选择数据集 →
+              点击「一键纠错」，即可查看该数据集的完整纠错结果与问题定位。
+            </li>
+            <li>
+              <b>上传演示：</b
+              >在「上传纠错」页签下载页面顶部的样例文件（JSON/CSV/TXT/XLSX
+              任一）→ 上传（可一次选多个文件）→ 预览解析结果 →
+              点击「开始纠错」。
+            </li>
+            <li>
+              <b>预期效果：</b>「正常报告集」应检出 0
+              条问题（零误报对照）；其余数据集的预期命中规则见数据集卡片上的说明。
+            </li>
+            <li>
+              <b>结果导出：</b
+              >纠错完成后点击结果区的「导出纠错结果（Excel）」按钮，即可下载含「质控概览
+              + 错误明细」两个 Sheet 的 Excel 文件。
+            </li>
+          </ol>
+        </div>
+
+        <div class="card">
+          <h2>HTTP 接口说明</h2>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>方法</th>
+                  <th>路径</th>
+                  <th>说明</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>GET</td>
+                  <td><code>/api/health</code></td>
+                  <td>服务状态、引擎版本、规则来源探针</td>
+                </tr>
+                <tr>
+                  <td>GET</td>
+                  <td><code>/api/rules</code></td>
+                  <td>查看当前生效的规则库</td>
+                </tr>
+                <tr>
+                  <td>GET</td>
+                  <td><code>/api/datasets</code></td>
+                  <td>预置测试数据集列表</td>
+                </tr>
+                <tr>
+                  <td>GET</td>
+                  <td><code>/api/datasets/{id}</code></td>
+                  <td>数据集详情（含报告列表）</td>
+                </tr>
+                <tr>
+                  <td>POST</td>
+                  <td><code>/api/datasets/{id}/check</code></td>
+                  <td>对预置数据集一键纠错</td>
+                </tr>
+                <tr>
+                  <td>POST</td>
+                  <td><code>/api/check</code></td>
+                  <td>单份报告纠错（标准 JSON 报告对象）</td>
+                </tr>
+                <tr>
+                  <td>POST</td>
+                  <td><code>/api/check/batch</code></td>
+                  <td>批量纠错：<code>{"reports": [...]}</code></td>
+                </tr>
+                <tr>
+                  <td>POST</td>
+                  <td><code>/api/export</code></td>
+                  <td>导出纠错结果为 Excel（质控概览 + 错误明细）</td>
+                </tr>
+                <tr>
+                  <td>POST</td>
+                  <td><code>/api/upload</code></td>
+                  <td>上传并解析一个或多个文件（不纠错，供预览）</td>
+                </tr>
+                <tr>
+                  <td>POST</td>
+                  <td><code>/api/upload/check</code></td>
+                  <td>上传 → 解析 → 纠错，单请求返回完整结果</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="hint">
+            完整接口文档（请求/响应示例、curl 调用）见部署包内
+            <code>README.md</code>；亦可访问
+            <code>/docs</code> 查看自动生成的交互式 API 文档。
+          </p>
+        </div>
+
+        <div class="card">
+          <h2>质控规则（9 类）</h2>
+          <p class="hint">
+            9 类错误类型即 9
+            条质控规则，检测、展示、筛选与导出统一按此归类，名称与质控
+            Excel「错误类型」统计列完全一致。
+          </p>
+          <div class="rule-grid" id="ruleGrid"></div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <span
+        >超声报告数据纠错系统 · 基于离线质控引擎（纯 Python
+        标准库，零外网依赖）</span
+      >
+    </footer>
+
+    <!-- 弹窗 -->
+    <div id="modalMask" class="modal-mask hidden">
+      <div class="modal">
+        <div class="modal-head">
+          <h3 id="modalTitle">详情</h3>
+          <button id="modalClose" class="modal-close" aria-label="关闭">
+            ×
+          </button>
+        </div>
+        <div class="modal-body" id="modalBody"></div>
       </div>
-      <div class="modal-body" id="modalBody"></div>
     </div>
-  </div>
 
-  <div id="toastWrap" class="toast-wrap"></div>
-  <script src="assets/app.js"></script>
-</body>
+    <div id="toastWrap" class="toast-wrap"></div>
+    <script src="assets/app.js"></script>
+  </body>
 </html>

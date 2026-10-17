@@ -1,8 +1,8 @@
 # Ultrasound QC Engine — 离线超声报告自动勘误与质控引擎
 
-轻量级本地质控引擎（**v1.1.0**）：读取 `rules.json` 规则库，对超声报告执行 A~H 八类质控规则
-（结论遗漏病变 / 左右侧不符 / 用词勘误 / 分级冲突 / 结论未涵盖所见 / 完整性规范 /
-性别与检查项目冲突 / 所见遗漏检查部位）。输入支持**标准 JSON 报告对象**（工作站集成规范）
+轻量级本地质控引擎（**v1.2.3**）：读取 `rules.json` 规则库，对超声报告执行 9 类质控规则检查
+（描述与结论不一致 / 分级不规范 / 语病或表述不规范 / 数据或单位错误 / 错别字或字段缺失 /
+模板文字未删除 / 遗漏检查部位 / 其他 / 性别年龄冲突）。输入支持**标准 JSON 报告对象**（工作站集成规范）
 与报告文本（兼容旧版 PACS 导出）。
 **纯 Python 标准库实现，零第三方依赖、零外网、零 GPU**，可打包为单文件 exe 部署于医院老旧
 Windows 电脑（Win7/Win10，32/64 位），供 PACS/报告系统对接。
@@ -16,8 +16,8 @@ Windows 电脑（Win7/Win10，32/64 位），供 PACS/报告系统对接。
 ## Web 端数据纠错系统
 
 仓库内 `webapp/` 提供可部署到 Linux 服务器的完整 Web 端数据纠错系统（前后端分离）：
-文件上传解析（txt/json/csv/tsv/xlsx）、一键纠错与实时状态提示、A~H 问题逐条定位与修改建议、
-纠错结果一键导出 Excel（质控概览 + 错误明细）、5 组免上传预置测试数据集、一键部署脚本（systemd/nginx）。
+文件上传解析（txt/json/csv/tsv/xlsx，支持一次上传多个文件合并纠错）、一键纠错与实时状态提示、问题逐条定位与修改建议、
+纠错结果一键导出 Excel（质控概览 + 错误明细）、8 组免上传预置测试数据集、一键部署脚本（systemd/nginx）。
 使用与部署详见 **[webapp/README.md](webapp/README.md)**。
 
 ---
@@ -30,7 +30,7 @@ Windows 电脑（Win7/Win10，32/64 位），供 PACS/报告系统对接。
 python qc_engine.py selftest        # 或双击运行: UltrasoundQCEngine-CLI.exe selftest
 ```
 
-8 个内置用例分别验证规则 A~H 与标准 JSON 输入，全部输出 PASS 即部署正常。
+26 个内置用例覆盖 9 类质控规则与标准 JSON 输入，全部输出 PASS 即部署正常。
 
 ### 1.2 命令行批量检测
 
@@ -114,8 +114,9 @@ UltrasoundQCEngine-v1.1.0/
   },
   "issues": [
     {
-      "rule_id": "H",
-      "rule": "所见遗漏检查部位",
+      "rule_id": "遗漏检查部位",
+      "rule": "遗漏检查部位",
+      "error_type": "遗漏检查部位",
       "severity": "high",
       "field": "finding",
       "fragment": "肝脏形态大小正常，包膜光滑，实质回声均匀。",
@@ -128,8 +129,8 @@ UltrasoundQCEngine-v1.1.0/
 }
 ```
 
-`issues` 为结构化错误提示数组，工作站前端可直接解析弹窗/高亮：`rule_id`（规则编号）、
-`rule`（规则名）、`severity`（high/medium）、`field`（问题字段）、`fragment`（原文片段）、
+`issues` 为结构化错误提示数组，工作站前端可直接解析弹窗/高亮：`rule_id`（错误类型名，与质控 Excel「错误类型」列一致，同时作为规则归类）、
+`rule`/`error_type`（同 rule_id，三者统一）、`severity`（high/medium）、`field`（问题字段）、`fragment`（原文片段）、
 `message`（问题描述）、`suggestion`（修改建议）。
 
 ### POST /api/check/batch — 批量质检
@@ -292,7 +293,7 @@ python build_exe.py --icon logo.ico  # 自定义图标
 | `rules.json`                 | 规则库（必须与 exe 同目录部署，可现场编辑，重启服务即生效）             |
 | `UltrasoundQCEngine.exe`     | 打包产物：无控制台服务版（常驻 HTTP）                                   |
 | `UltrasoundQCEngine-CLI.exe` | 打包产物：控制台批量版（自检/批量检测）                                 |
-| `source/qc_engine.py`        | 引擎完整源码（标准 JSON/文本解析、A~H 规则、CLI、HTTP、Excel 导出）     |
+| `source/qc_engine.py`        | 引擎完整源码（标准 JSON/文本解析、9 类规则、CLI、HTTP、Excel 导出）     |
 | `source/build_exe.py`        | PyInstaller 一键打包脚本                                                |
 | `source/extract_rules.py`    | 大模型质控 Excel → rules.json 规则提炼脚本（上游配套）                  |
 | `source/blind_test.py`       | 盲测工具：prepare 抽样 100 份 / compare 对比大模型结果，输出 FN/FP 明细 |

@@ -101,7 +101,13 @@ function makeSteps(labels, activeIdx = -1, doneAll = false, error = false) {
 
 /* ================= 上传流程 ================= */
 const UPLOAD_STEPS = ["上传文件", "解析数据", "纠错分析", "完成"];
-const uploadState = { filename: "", reports: [], warnings: [], format: "" };
+const uploadState = {
+  filename: "",
+  files: [],
+  reports: [],
+  warnings: [],
+  format: "",
+};
 
 function setUploadStepper(activeIdx, doneAll = false, error = false) {
   renderStepper(
@@ -130,30 +136,39 @@ dropzone.addEventListener("keydown", (e) => {
   }),
 );
 dropzone.addEventListener("drop", (e) => {
-  const file = e.dataTransfer.files && e.dataTransfer.files[0];
-  if (file) handleFile(file);
+  const files = Array.from((e.dataTransfer && e.dataTransfer.files) || []);
+  if (files.length) handleFiles(files);
 });
 fileInput.addEventListener("change", () => {
-  if (fileInput.files && fileInput.files[0]) handleFile(fileInput.files[0]);
+  const files = Array.from(fileInput.files || []);
+  // 关键：立即清空 input 值，否则同一文件（尤其同名）再次选择时浏览器认为
+  // 值未变化而不触发 change 事件，导致修改内容后重新上传仍是旧数据。
+  fileInput.value = "";
+  if (files.length) handleFiles(files);
 });
 
-async function handleFile(file) {
+async function handleFiles(fileList) {
+  const files = fileList.slice(0, 20);
+  if (fileList.length > 20) {
+    toast("单次最多上传 20 个文件，已截取前 20 个", "error");
+  }
   const fd = new FormData();
-  fd.append("file", file);
+  files.forEach((f) => fd.append("file", f));
   setUploadStepper(1);
-  $("#uploadHint").textContent = "正在上传并解析文件…";
+  $("#uploadHint").textContent = `正在上传并解析 ${files.length} 个文件…`;
   $("#uploadResult").innerHTML = "";
   try {
     const data = await fetchJSON("/api/upload", { method: "POST", body: fd });
     uploadState.filename = data.filename;
+    uploadState.files = data.files || files.map((f) => f.name);
     uploadState.reports = data.reports;
     uploadState.warnings = data.warnings || [];
     uploadState.format = data.format;
 
     $("#fileInfo").classList.remove("hidden");
     $("#fileInfo").innerHTML = `
-      <span class="fi-tag">${esc(data.format.toUpperCase())}</span>
-      <span class="fi-name">${esc(data.filename)}</span>
+      <span class="fi-tag">${esc(String(data.format).toUpperCase())}</span>
+      <span class="fi-name">${esc(uploadState.files.join("、"))}</span>
       <span>解析出 <b>${data.report_count}</b> 份报告</span>`;
 
     const warnBox = $("#uploadWarn");
@@ -171,7 +186,7 @@ async function handleFile(file) {
     setUploadStepper(2);
     $("#runUploadBtn").disabled = false;
     $("#uploadHint").textContent =
-      "解析完成，点击「开始纠错」执行 A~H 全部质控规则。";
+      "解析完成，点击「开始纠错」执行 9 类质控规则检查。";
     toast(`解析完成：${data.report_count} 份报告`, "success");
   } catch (e) {
     setUploadStepper(1, false, true);
@@ -189,6 +204,7 @@ function renderPreview(reports) {
       (r) => `
     <tr>
       <td>${esc(r.report_id)}</td>
+      <td><span class="cell-clip" title="${esc(r.source_file || "")}">${esc(r.source_file) || "—"}</span></td>
       <td>${esc(r.exam_item) || "—"}</td>
       <td>${esc(r.gender) || "—"}</td>
       <td>${esc(r.age) || "—"}</td>
@@ -226,6 +242,7 @@ $("#runUploadBtn").addEventListener("click", async () => {
 
 $("#resetUploadBtn").addEventListener("click", () => {
   uploadState.filename = "";
+  uploadState.files = [];
   uploadState.reports = [];
   uploadState.warnings = [];
   fileInput.value = "";
@@ -358,16 +375,6 @@ async function runDataset(dsId) {
 }
 
 /* ================= 结果展示 ================= */
-const RULE_NAMES = {
-  A: "结论遗漏病变",
-  B: "左右侧不符",
-  C: "用词勘误",
-  D: "分级冲突",
-  E: "结论未涵盖所见",
-  F: "完整性与书写规范",
-  G: "性别与检查项目冲突",
-  H: "所见遗漏检查部位",
-};
 const FIELD_NAMES = {
   finding: "超声所见",
   conclusion: "超声提示",
@@ -376,12 +383,21 @@ const FIELD_NAMES = {
   gender: "性别",
   report: "报告整体",
 };
+/* 9 类质控规则（即错误类型，名称与质控 Excel「错误类型」列一致，不可改动） */
+const ERROR_TYPES = [
+  "描述与结论不一致",
+  "分级不规范",
+  "语病或表述不规范",
+  "数据或单位错误",
+  "错别字或字段缺失",
+  "模板文字未删除",
+  "遗漏检查部位",
+  "其他",
+  "性别年龄冲突",
+];
 
 function renderResult(container, data, sourceLabel) {
   const s = data.summary;
-  const ruleChips = Object.entries(s.by_rule || {})
-    .map(([rid, n]) => `<span class="chip rule">规则 ${esc(rid)} × ${n}</span>`)
-    .join("");
 
   container.innerHTML = `
     <div class="card">
@@ -400,7 +416,17 @@ function renderResult(container, data, sourceLabel) {
         <div class="stat"><div class="stat-num">${s.elapsed_ms}<span style="font-size:12px"> ms</span></div>
           <div class="stat-label">引擎处理耗时</div></div>
       </div>
-      ${ruleChips ? `<div class="ds-meta" style="margin-bottom:14px">${ruleChips}</div>` : ""}
+      ${
+        Object.keys(s.by_error_type || {}).length
+          ? `<div class="ds-meta" style="margin-bottom:14px">${Object.entries(
+              s.by_error_type,
+            )
+              .map(
+                ([t, n]) => `<span class="chip rule">${esc(t)} × ${n}</span>`,
+              )
+              .join("")}</div>`
+          : ""
+      }
       <div class="btn-row" style="margin-bottom:14px">
         <button class="btn-small primary" data-export>导出纠错结果（Excel）</button>
         <span class="fb-label" style="align-self:center">导出文件包含「质控概览 + 错误明细」两个 Sheet</span>
@@ -410,14 +436,9 @@ function renderResult(container, data, sourceLabel) {
         <button class="f-btn active" data-sev="all">全部</button>
         <button class="f-btn" data-sev="high">高风险</button>
         <button class="f-btn" data-sev="medium">中风险</button>
-        <select data-rule>
+        <select data-etype>
           <option value="all">全部规则</option>
-          ${Object.keys(s.by_rule || {})
-            .map(
-              (rid) =>
-                `<option value="${esc(rid)}">规则 ${esc(rid)} · ${esc(RULE_NAMES[rid] || "")}</option>`,
-            )
-            .join("")}
+          ${ERROR_TYPES.map((t) => `<option value="${esc(t)}">${esc(t)}</option>`).join("")}
         </select>
         <span class="fb-label" data-count></span>
       </div>
@@ -450,19 +471,18 @@ function renderResult(container, data, sourceLabel) {
     </div>`;
 
   // 问题筛选与列表
-  const state = { sev: "all", rule: "all" };
+  const state = { sev: "all", etype: "all" };
   const issues = [];
   data.results.forEach((r) =>
     r.issues.forEach((it) => issues.push({ ...it, report_id: r.report_id })),
   );
-
   const listEl = container.querySelector("[data-issues]");
   const countEl = container.querySelector("[data-count]");
   const paint = () => {
     const shown = issues.filter(
       (it) =>
         (state.sev === "all" || it.severity === state.sev) &&
-        (state.rule === "all" || it.rule_id === state.rule),
+        (state.etype === "all" || it.error_type === state.etype),
     );
     countEl.textContent = `显示 ${shown.length} / ${issues.length} 条问题`;
     if (!issues.length) {
@@ -478,7 +498,7 @@ function renderResult(container, data, sourceLabel) {
         (it) => `
       <div class="issue-card ${esc(it.severity)}">
         <div class="issue-top">
-          <span class="badge rule">规则 ${esc(it.rule_id)} · ${esc(it.rule)}</span>
+          <span class="badge rule">${esc(it.error_type || "其他")}</span>
           <span class="badge ${it.severity === "high" ? "sev-high" : "sev-medium"}">
             ${it.severity === "high" ? "高风险" : "中风险"}</span>
           <span class="badge rid">${esc(it.report_id)}</span>
@@ -503,8 +523,8 @@ function renderResult(container, data, sourceLabel) {
       paint();
     }),
   );
-  container.querySelector("[data-rule]").addEventListener("change", (e) => {
-    state.rule = e.target.value;
+  container.querySelector("[data-etype]").addEventListener("change", (e) => {
+    state.etype = e.target.value;
     paint();
   });
 
@@ -541,6 +561,7 @@ async function exportResult(data, sourceLabel) {
   const reports = data.results.map((r) => ({
     report_id: r.report_id,
     ...r.report,
+    source_file: r.report && r.report.source_file,
   }));
   let resp;
   try {
@@ -582,7 +603,7 @@ function showReportDetail(r) {
           (it) => `
         <div class="issue-card ${esc(it.severity)}">
           <div class="issue-top">
-            <span class="badge rule">规则 ${esc(it.rule_id)} · ${esc(it.rule)}</span>
+            <span class="badge rule">${esc(it.error_type || "其他")}</span>
             <span class="badge ${it.severity === "high" ? "sev-high" : "sev-medium"}">
               ${it.severity === "high" ? "高风险" : "中风险"}</span>
           </div>
@@ -625,37 +646,46 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") $("#modalMask").classList.add("hidden");
 });
 
-/* ================= 帮助页规则速览 ================= */
+/* ================= 帮助页：质控规则（9 类，即错误类型，名称不可改动） ================= */
 const RULES_HELP = [
-  ["A", "结论遗漏病变", "所见含结节/囊肿/占位等强病灶词，结论却为纯阴性表述"],
-  ["B", "左右侧不符", "所见与结论中同一器官左右侧互相冲突"],
-  ["C", "用词勘误", "命中纠错映射表（如 回音→回声），给出规范替换建议"],
   [
-    "D",
-    "分级冲突",
-    "所见与结论分级不一致 / 风险征象对应分级偏低 / 非标准分级写法",
-  ],
-  ["E", "结论未涵盖所见", "所见病灶在结论中无任何等价呼应，存在遗漏风险"],
-  ["F", "完整性与书写规范", "建议语缺时间数值、数值粘连、检查项目与内容不符等"],
-  [
-    "G",
-    "性别与检查项目冲突",
-    "患者性别与检查项目/所见部位矛盾（男见子宫、女见前列腺等）",
+    "描述与结论不一致",
+    "所见含结节/囊肿/占位等强病灶词而结论为纯阴性表述、左右侧互相冲突、结论未涵盖所见病灶",
   ],
   [
-    "H",
-    "所见遗漏检查部位",
-    "检查项目要求多部位，所见仅描述其中一部分，报出缺失部位",
+    "分级不规范",
+    "分级前后不一致、同一结论多分级并存（3类/4a类并写）、恶性征象对应分级偏低、分级写法不规范（如“3级”应写“3类”）",
+  ],
+  [
+    "语病或表述不规范",
+    "建议语缺时间数值、叠词重复（如“大小大小”）、标点重复、空括号、句末缺标点等书写语病",
+  ],
+  [
+    "数据或单位错误",
+    "测量值单位错误/缺失（如径线写作 m 或漏写单位）、未删测量值占位符、径线量纲异常（疑似小数点错）、数值粘连/丢失乘号（如 1.512cm）、测量范围颠倒（如 2.5-1.6cm）",
+  ],
+  [
+    "错别字或字段缺失",
+    "命中纠错映射表的错别字（如 回音→回声）、核心字段（所见/结论）缺失",
+  ],
+  [
+    "模板文字未删除",
+    "整句模板重复（同句重复出现）、同一部位矛盾描述（见淋巴结又未见淋巴结）、测量值占位符残留、括号残片/无关残留字词（如“(不完整，)”“未了。”）",
+  ],
+  ["遗漏检查部位", "检查项目要求多部位，所见仅描述其中一部分，报出缺失部位"],
+  ["其他", "检查项目与实际检查内容不符（如妇科项目写胎儿描述）"],
+  [
+    "性别年龄冲突",
+    "患者性别与检查项目/所见/结论中的特有部位矛盾（男见子宫、女见前列腺等）、年龄与检查内容逻辑冲突（如 79 岁出现妊娠/胎儿描述）",
   ],
 ];
 
 function renderRuleGrid() {
   $("#ruleGrid").innerHTML = RULES_HELP.map(
-    ([id, name, desc]) => `
+    ([name, desc]) => `
     <div class="rule-item">
       <div class="ri-head">
-        <span class="badge rule">规则 ${id}</span>
-        <span class="ri-name">${esc(name)}</span>
+        <span class="badge rule">${esc(name)}</span>
       </div>
       <p class="ri-desc">${esc(desc)}</p>
     </div>`,

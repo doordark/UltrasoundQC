@@ -36,7 +36,7 @@ from .engine_adapter import (
 app = FastAPI(
     title=config.SERVICE_NAME,
     version=config.SERVICE_VERSION,
-    description="离线超声报告质控引擎（A~H 八类规则）的 Web 端数据纠错系统",
+    description="离线超声报告质控引擎（A~J 十类规则）的 Web 端数据纠错系统",
 )
 
 app.add_middleware(
@@ -165,7 +165,9 @@ def export_batch(payload: dict = Body(...)):
     请求体同 /api/check/batch，可选 "source" 作为文件名前缀标识。
     """
     reports, _warnings = _normalize_reports(payload)
-    results = [{"file": rep["report_id"], "result": check_one(rep)} for rep in reports]
+    results = [{"file": f"{rep.get('source_file')}/{rep['report_id']}" if rep.get("source_file")
+                else rep["report_id"],
+                "result": check_one(rep)} for rep in reports]
 
     fd, tmp_path = tempfile.mkstemp(prefix="qc_export_", suffix=".xlsx")
     os.close(fd)
@@ -189,49 +191,101 @@ def export_batch(payload: dict = Body(...)):
 
 # ============================ 文件上传 ============================
 
+MAX_UPLOAD_FILES = 20
+MAX_UPLOAD_TOTAL_BYTES = 100 * 1024 * 1024  # 单次上传总量上限 100MB
+
+
 async def _read_upload(file: UploadFile) -> bytes:
     data = await file.read()
     if not data:
-        raise HTTPException(status_code=400, detail="上传文件为空")
+        raise HTTPException(status_code=400, detail=f"上传文件“{file.filename or ''}”为空")
     if len(data) > config.MAX_UPLOAD_BYTES:
         raise HTTPException(
             status_code=413,
-            detail=f"文件超过大小限制（{config.MAX_UPLOAD_BYTES // (1024 * 1024)}MB）",
+            detail=f"文件“{file.filename or ''}”超过大小限制（{config.MAX_UPLOAD_BYTES // (1024 * 1024)}MB）",
         )
     return data
 
 
+async def _read_uploads(files: list[UploadFile]) -> list[tuple[str, bytes]]:
+    """读取一批上传文件（1~MAX_UPLOAD_FILES 个），校验单文件与总量限制。"""
+    if not files:
+        raise HTTPException(status_code=400, detail="未收到上传文件")
+    if len(files) > MAX_UPLOAD_FILES:
+        raise HTTPException(status_code=400, detail=f"单次最多上传 {MAX_UPLOAD_FILES} 个文件")
+    items: list[tuple[str, bytes]] = []
+    total = 0
+    for f in files:
+        data = await _read_upload(f)
+        total += len(data)
+        if total > MAX_UPLOAD_TOTAL_BYTES:
+            raise HTTPException(
+                status_code=413,
+                detail=f"上传文件总量超过限制（{MAX_UPLOAD_TOTAL_BYTES // (1024 * 1024)}MB）",
+            )
+        items.append((f.filename or "", data))
+    return items
+
+
+def _merge_parsed(items: list[tuple[str, bytes]]) -> dict:
+    """逐文件解析并合并报告：report_id 全局统一编号，报告标注 source_file 来源文件。"""
+    reports: list[dict] = []
+    warnings: list[str] = []
+    formats: list[str] = []
+    names: list[str] = []
+    for fname, data in items:
+        try:
+            parsed = parsers.parse_upload(fname, data)
+        except ValueError as exc:
+            warnings.append(f"「{fname}」解析失败：{exc}")
+            continue
+        formats.append(parsed["format"])
+        names.append(fname)
+        for rep in parsed["reports"]:
+            rep["source_file"] = fname
+            reports.append(rep)
+        warnings.extend(f"「{fname}」{w}" for w in parsed["warnings"])
+    if not reports:
+        raise HTTPException(status_code=400, detail="未能从上传文件中解析出任何报告，请检查文件内容与格式")
+    for i, rep in enumerate(reports):
+        rep["report_id"] = f"R{i + 1:03d}"
+    fmt = formats[0] if len(set(formats)) == 1 else "mixed"
+    filename = names[0] if len(names) == 1 else f"{len(names)} 个文件"
+    return {"format": fmt, "filename": filename, "files": names,
+            "reports": reports, "warnings": warnings}
+
+
 @app.post("/api/upload")
-async def upload_parse(file: UploadFile = File(...)):
-    """上传并解析文件（不纠错），返回标准报告列表供前端预览。"""
-    data = await _read_upload(file)
-    try:
-        parsed = parsers.parse_upload(file.filename or "", data)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+async def upload_parse(file: list[UploadFile] = File(...)):
+    """上传并解析一个或多个文件（不纠错），返回合并的标准报告列表供前端预览。
+
+    同名表单字段 `file` 重复出现即为多文件。
+    """
+    items = await _read_uploads(file)
+    merged = _merge_parsed(items)
     return {
         "ok": True,
-        "filename": file.filename,
-        "format": parsed["format"],
-        "report_count": len(parsed["reports"]),
-        "reports": parsed["reports"],
-        "warnings": parsed["warnings"],
+        "filename": merged["filename"],
+        "files": merged["files"],
+        "file_count": len(items),
+        "format": merged["format"],
+        "report_count": len(merged["reports"]),
+        "reports": merged["reports"],
+        "warnings": merged["warnings"],
     }
 
 
 @app.post("/api/upload/check")
-async def upload_check(file: UploadFile = File(...)):
-    """一键纠错：上传 → 解析 → 批量质控，单请求返回完整结果。"""
-    data = await _read_upload(file)
-    try:
-        parsed = parsers.parse_upload(file.filename or "", data)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    batch = run_batch(parsed["reports"])
+async def upload_check(file: list[UploadFile] = File(...)):
+    """一键纠错：上传（可多个文件）→ 解析合并 → 批量质控，单请求返回完整结果。"""
+    items = await _read_uploads(file)
+    merged = _merge_parsed(items)
+    batch = run_batch(merged["reports"])
     return {
         "ok": True,
-        "source": {"type": "upload", "filename": file.filename, "format": parsed["format"]},
-        "warnings": parsed["warnings"],
+        "source": {"type": "upload", "filename": merged["filename"],
+                   "files": merged["files"], "format": merged["format"]},
+        "warnings": merged["warnings"],
         **batch,
     }
 

@@ -1,0 +1,57 @@
+{
+  "id": "measurement-redundancy",
+  "name": "数据单位与语句重复集（规则 I/J）",
+  "description": "4 份分别命中单位误录、径线量纲异常、测量值占位符未删、语句重复的报告，覆盖数据与单位异常、语句重复两类规则。",
+  "category": "典型错误",
+  "tags": [
+    "I",
+    "J"
+  ],
+  "expectation": "每份报告各命中 1~2 条问题，共 6 条",
+  "reports": [
+    {
+      "report_id": "I001",
+      "exam_item": "甲状腺彩超",
+      "gender": "女",
+      "age": "45",
+      "finding": "甲状腺右叶见一低回声结节，大小约2.5*1.6m，边界清晰，边缘光整。",
+      "conclusion": "甲状腺右叶结节（C-TIRADS 3类）。",
+      "expect_rules": [
+        "数据或单位错误"
+      ]
+    },
+    {
+      "report_id": "I002",
+      "exam_item": "甲状腺彩超",
+      "gender": "女",
+      "age": "45",
+      "finding": "甲状腺左叶见一低回声结节，大小约1.5*12cm，边界清晰。",
+      "conclusion": "甲状腺左叶结节（C-TIRADS 3类）。",
+      "expect_rules": [
+        "数据或单位错误"
+      ]
+    },
+    {
+      "report_id": "I003",
+      "exam_item": "乳腺彩超",
+      "gender": "女",
+      "age": "40",
+      "finding": "左乳见一低回声团，内见大小约*cm低回声团，大小约3.9*3.6cm，边界清。",
+      "conclusion": "左乳结节（BI-RADS 3类），建议随访。",
+      "expect_rules": [
+        "数据或单位错误"
+      ]
+    },
+    {
+      "report_id": "J001",
+      "exam_item": "甲状腺彩超",
+      "gender": "女",
+      "age": "45",
+      "finding": "甲状腺右叶较大的一枚大小大小约2.5*1.6cm，边界清晰，边缘光整。",
+      "conclusion": "甲状腺右叶结节（C-TIRADS 3类）。",
+      "expect_rules": [
+        "语病或表述不规范"
+      ]
+    }
+  ]
+}

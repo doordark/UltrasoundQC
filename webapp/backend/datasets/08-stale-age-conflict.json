@@ -1,0 +1,39 @@
+{
+  "id": "stale-fragment-age-conflict",
+  "name": "08 模板残留与年龄逻辑冲突",
+  "description": "覆盖 G2 年龄与检查内容冲突（79 岁产科检查）与 J3 模板残留碎片（括号残片/无关字词），均归入既有错误类型",
+  "expect_total": 3,
+  "expect_issue_reports": 2,
+  "reports": [
+    {
+      "report_id": "S001",
+      "title": "高龄产科报告-年龄逻辑冲突",
+      "expect_rules": [
+        "性别年龄冲突"
+      ],
+      "expect_error_type": [
+        "性别年龄冲突"
+      ],
+      "exam_item": "彩色多普勒超声常规检查（产科）",
+      "gender": "女",
+      "age": "79岁",
+      "finding": "胎儿头位于耻骨联合上方，双顶径约8.6cm，羊水最大深径5.2cm，脐动脉血流S/D:2.5。",
+      "conclusion": "单胎 晚孕 头位，脐带绕颈一周。"
+    },
+    {
+      "report_id": "S002",
+      "title": "甲状腺报告-模板残留碎片",
+      "expect_rules": [
+        "模板文字未删除"
+      ],
+      "expect_error_type": [
+        "模板文字未删除"
+      ],
+      "exam_item": "甲状腺超声",
+      "gender": "女",
+      "age": "45",
+      "finding": "甲状腺右叶见低回声结节，边界清晰(不完整，)。CDFI：结节内见血流信号。未了。",
+      "conclusion": "甲状腺右叶结节（C-TIRADS 3类）。"
+    }
+  ]
+}
