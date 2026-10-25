@@ -24,13 +24,15 @@ Windows 环境（Win7/Win10, 32/64 位）设计，可由 PyInstaller 打包为�
     A 结论遗漏病变: 所见含阳性病变词，结论却为纯阴性表述（带否定词识别，防误报）
     B 左右侧不符  : 所见与结论中同一器官的左右侧表述冲突（器官级配对 + 全局兜底）
     C 用词勘误    : 命中纠错映射表（如 回音->回声），给出替换建议
-    D 分级冲突    : BI-RADS/TI-RADS 分级与所见恶性征象不匹配（如微钙化却给 2 类）
+    D 分级冲突    : BI-RADS/TI-RADS 分级与所见恶性征象不匹配（如微钙化却给 2 类）；
+                    分级体系与检查部位不符（乳腺报告误用 C-TIRADS 等）
     E 结论未涵盖所见: 所见病灶/征象在结论中无任何呼应（产前报告豁免）
     F 完整性与书写规范: 检查项目缺失 / 建议缺时间数值 / 数值粘连 / 项目与内容不符
     G 性别与检查项目冲突: 患者性别与检查项目/所见部位矛盾（男见子宫卵巢、女见前列腺）
     H 所见遗漏检查部位: 检查项目要求多个部位（如肝胆胰脾），所见缺少部分器官描述
     I 数据与单位异常  : 测量值单位错误/缺失、未删测量值占位符、径线量纲异常（疑似小数点错）
-    J 语句重复        : 叠词重复（如"大小大小"）/ 整句模板重复冗余未删除
+    J 语句重复        : 叠词重复（如"大小大小"）/ 整句模板重复冗余未删除；
+                       模板占位符残留（"*侧""*个""mm×mm""低回声/高回声/强回声"等）
 """
 
 from __future__ import annotations
@@ -48,7 +50,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from xml.sax.saxutils import escape
 
-ENGINE_VERSION = "1.2.4"
+ENGINE_VERSION = "1.3.0"
 MAX_BODY_BYTES = 8 * 1024 * 1024  # HTTP 请求体上限 8MB
 
 # ============================ 质控规则（9 类错误类型，名称不可改动） ============================
@@ -74,14 +76,15 @@ CHECK_ERROR_TYPE = {
     "A": ERR_DESC_MISMATCH, "B": ERR_DESC_MISMATCH, "E": ERR_DESC_MISMATCH,
     "C": ERR_TYPO_FIELD, "C2": ERR_TYPO_FIELD,
     "D": ERR_GRADING, "D1": ERR_GRADING, "D2": ERR_GRADING, "D3": ERR_GRADING, "D4": ERR_GRADING,
+    "D5": ERR_GRADING,
     "F2": ERR_WORDING, "F3": ERR_DATA_UNIT, "F4": ERR_OTHER,
-    "F5": ERR_WORDING, "F6": ERR_WORDING,
+    "F5": ERR_WORDING, "F6": ERR_WORDING, "F8": ERR_WORDING,
     "G": ERR_GENDER_AGE, "G2": ERR_GENDER_AGE, "G3": ERR_GENDER_AGE,
     "H": ERR_MISSING_PART,
     "I": ERR_DATA_UNIT, "I1": ERR_DATA_UNIT, "I2": ERR_DATA_UNIT, "I3": ERR_DATA_UNIT,
     "I4": ERR_DATA_UNIT, "I5": ERR_DATA_UNIT, "I6": ERR_DATA_UNIT, "I7": ERR_DATA_UNIT,
     "J1": ERR_WORDING, "J2": ERR_TEMPLATE_LEFT, "J3": ERR_TEMPLATE_LEFT,
-    "J4": ERR_TEMPLATE_LEFT,
+    "J4": ERR_TEMPLATE_LEFT, "J5": ERR_TEMPLATE_LEFT,
 }
 
 # ============================ 内置默认规则（rules.json 缺失时兜底） ============================
@@ -110,6 +113,14 @@ DEFAULT_RULES = {
             "血流丰富": 4, "血流较丰富": 4, "簇状钙化": 4,
         },
     },
+    # 规则 D5：分级体系与检查部位对应关系（模板库口径：BI-RADS 用于乳腺、
+    # TI-RADS/C-TIRADS 用于甲状腺、O-RADS 用于卵巢/附件）。检查项目属甲体系
+    # 却使用乙体系分级、且全文无乙体系器官描述时报"分级不规范"
+    "grading_systems": {
+        "乳腺": {"systems": ["BI-RADS"], "organs": ["乳腺", "乳房", "副乳"]},
+        "甲状腺": {"systems": ["TI-RADS", "C-TIRADS"], "organs": ["甲状腺"]},
+        "卵巢": {"systems": ["O-RADS"], "organs": ["卵巢", "附件", "输卵管", "妇科", "子宫附件"]},
+    },
     # 规则 G：性别与检查项目/所见部位冲突（词表可配置，医院现场可增删）
     # 男 + female_organs / 女 + male_organs → 冲突；乳腺属可配置项（男性乳腺检查存在但少见）
     "gender_conflict": {
@@ -129,13 +140,16 @@ DEFAULT_RULES = {
     },
     # 规则 H：检查项目 → 应查部位映射（organs 中任一器官在所见中无描述即报漏项；
     # 仅当部分器官已描述而其余缺失时触发，单部位项目/整段未描述不误报）
+    # 项目/部位口径参照院内模板库（明基超声模板重组）：腹部默认含双肾，
+    # 阴囊含睾丸+附睾（颈动脉等临床常只写颈总动脉的报告不纳入，避免误报）
     "exam_organ_map": {
         "organ_aliases": {
             "肝": ["肝", "肝脏"], "胆": ["胆", "胆囊", "胆管"], "胰": ["胰", "胰腺"],
             "脾": ["脾", "脾脏"], "肾": ["肾", "肾脏"], "输尿管": ["输尿管"],
             "膀胱": ["膀胱"], "甲状腺": ["甲状腺"], "乳腺": ["乳腺", "乳房", "乳"],
-            "子宫": ["子宫"], "卵巢": ["卵巢"], "附件": ["附件", "输卵管"],
+            "子宫": ["子宫"], "卵巢": ["卵巢"], "附件": ["附件", "输卵管", "卵巢"],
             "前列腺": ["前列腺"], "心脏": ["心脏", "心房", "心室", "心肌", "左室", "右室", "左房", "右房"],
+            "睾丸": ["睾丸"], "附睾": ["附睾", "附睾头", "附睾尾"],
         },
         "exam_items": [
             {"exam": ["肝胆胰脾", "肝胆脾胰"], "organs": ["肝", "胆", "胰", "脾"]},
@@ -146,6 +160,8 @@ DEFAULT_RULES = {
             {"exam": ["肾输尿管膀胱", "泌尿系", "泌尿系统", "双肾输尿管"], "organs": ["肾", "输尿管", "膀胱"]},
             {"exam": ["肾输尿管", "双肾"], "organs": ["肾", "输尿管"]},
             {"exam": ["子宫附件", "子宫双附件", "双侧附件", "子宫卵巢"], "organs": ["子宫", "附件"]},
+            {"exam": ["腹部彩超", "腹部B超"], "organs": ["肝", "胆", "胰", "脾", "肾"]},
+            {"exam": ["阴囊", "睾丸", "附睾"], "organs": ["睾丸", "附睾"]},
         ],
     },
     # 规则 I：测量值与单位异常（阈值可按院内口径调整）
@@ -161,10 +177,33 @@ DEFAULT_RULES = {
         "similarity_threshold": 0.85,     # 语句相似度阈值（归一化后 SequenceMatcher ratio）
         "min_sentence_len": 10,           # 参与重复比对的最短语句长度
     },
+    # 规则 J5：模板占位符残留（依据院内模板库「明基超声模板重组」的待填字段口径）。
+    # 模板中的 "*侧""*个""mm×mm""约 mm""规则/不规则" 等占位符若出现在真实报告中，
+    # 说明模板未删/未填写，归入「模板文字未删除」。词表可按院内模板增删
+    "template_placeholders": {
+        "star_tokens": ["*侧", "*个", "*枚", "*条", "*支", "*叶", "*部", "*处",
+                        "*区", "*壁", "*段", "*位", "*回声", "*附件区", "*肾"],
+        "empty_measure_tokens": ["mm×mm", "mm*mm", "mmxmm", "cm×cm", "cm*cm",
+                                 "约 mm", "约mm", "大小mm", "长径mm", "厚径mm",
+                                 "内径mm", "厚度mm", "内膜mm"],
+        "slash_options": ["规则/不规则", "均质/不均质", "有/无声影", "无/单发/多发",
+                          "低回声/高回声", "低回声/高回声/强回声/混合回声",
+                          "低回声/高回声/强回声", "清晰/欠清晰", "正常/异常"],
+        "slash_min_parts": 3,             # 括号内斜杠选项达到该数量即判未选择（三选一以上）
+    },
     # 规则 J3：模板残留碎片（孤立括号残片/无关字词，如"(不完整，)""未了。"）
     "stale_fragments": ["未了", "不完整", "未填", "未填写", "待补", "待填", "待查",
                         "此处填写", "见上", "同上", "？？", "??", "xx", "XX"],
     "stale_max_len": 8,                   # 括号内超过该长度的视为正常括注，不判残留
+    # 规则 F8：属性描述缺失（"外形，形态，"后无任何描述，句子不完整）
+    # trigger_words 命中后紧跟标点/句末且无描述即报；chain_words 为逗号分句中可共享
+    # 后续描述的并列属性词（"外形，形态正常"不报），enum_words 为顿号并列可共享谓语的
+    # 属性词（"形态、活动正常"不报）
+    "incomplete_desc_rules": {
+        "trigger_words": ["外形", "形态"],
+        "chain_words": ["外形", "形态", "大小", "轮廓"],
+        "enum_words": ["活动", "活动度", "边界", "边缘", "包膜", "内膜", "回声", "厚度", "位置"],
+    },
     # 规则 J4：合法英文缩写白名单（小写比较）；白名单外的连续字母串（≥3 字母，如"ggun"）
     # 判为乱码/无关残留文本。院内规范缩写可在此追加
     "allowed_abbreviations": [
@@ -274,6 +313,11 @@ STALE_FRAG_HINT_RE = re.compile(r"(未|待|不|缺|补|填|写|\?|？|…|\.{2,}
 # 规则 J4 无关字母串/乱码（"ggun"）：连续 3 个以上拉丁字母，白名单缩写除外
 LATIN_RUN_RE = re.compile(r"[A-Za-z]{3,}")
 
+# 规则 J5 斜杠选项未选择：括号内以斜杠并列 ≥3 个待选项
+# （"（规则/不规则、均质/不均质、低回声/高回声/强回声/混合回声）"）
+SLASH_OPTION_BRACKET_RE = re.compile(
+    r"[（(][^（）()\n]{0,60}(?:/[^（）()\n]{0,24}){2,}[）)]")
+
 # 规则 B 侧别-器官提取：侧别字(容许夹空格) + 后续 0~8 个汉字（后续再裁剪出器官名）
 SIDE_ORGAN_RE = re.compile(r"([左右双])\s*侧?\s*([\u4e00-\u9fa5]{0,8})")
 ORGAN_CUT_CHARS = set("见探有未可内上下的与及各低强无囊实结占肿区回液网密点右左")
@@ -286,6 +330,9 @@ GRADE_RE = re.compile(
     re.IGNORECASE)
 GRADE_SYSTEM_RE = re.compile(  # 仅系统名（供 D3 分级写法检查定位）
     r"(?:BI|TI)[-‐–—]?RADS|C[-‐–—]?TIRADS?", re.IGNORECASE)
+# 规则 D5 分级体系名（含 O-RADS/LI-RADS 等），用于体系与检查部位匹配校验
+GRADING_SYSTEM_MENTION_RE = re.compile(
+    r"(?:BI|TI|C[-‐–—]?TI|O|LI)[-‐–—]?RADS", re.IGNORECASE)
 
 # 报告字段标签（正则按"标签+冒号"或"行首标签"两种模式匹配，自适应中英文混乱格式）
 # 中文标签 + 英文标签（老旧 PACS 导出常见 examItem/finding/conclusion 风格）
@@ -501,6 +548,7 @@ def load_rules(rules_path) -> tuple[dict, str]:
         return rules, "内置默认规则"
 
     rules = {
+        "meta": raw.get("meta") or {},
         "positive_keywords": _normalize_list(raw.get("positive_keywords")) or DEFAULT_RULES["positive_keywords"],
         "side_keywords": _normalize_list(raw.get("side_keywords")) or DEFAULT_RULES["side_keywords"],
         "correction_mapping": _normalize_mapping(raw.get("correction_mapping")) or DEFAULT_RULES["correction_mapping"],
@@ -510,10 +558,15 @@ def load_rules(rules_path) -> tuple[dict, str]:
         "gender_conflict": {**DEFAULT_RULES["gender_conflict"], **(raw.get("gender_conflict") or {})},
         "age_rules": {**DEFAULT_RULES["age_rules"], **(raw.get("age_rules") or {})},
         "exam_organ_map": {**DEFAULT_RULES["exam_organ_map"], **(raw.get("exam_organ_map") or {})},
+        "grading_systems": raw.get("grading_systems") or DEFAULT_RULES["grading_systems"],
+        "template_placeholders": {**DEFAULT_RULES["template_placeholders"],
+                                 **(raw.get("template_placeholders") or {})},
         "measurement_rules": {**DEFAULT_RULES["measurement_rules"], **(raw.get("measurement_rules") or {})},
         "redundancy_rules": {**DEFAULT_RULES["redundancy_rules"], **(raw.get("redundancy_rules") or {})},
         "stale_fragments": raw.get("stale_fragments") or DEFAULT_RULES["stale_fragments"],
         "stale_max_len": raw.get("stale_max_len") or DEFAULT_RULES["stale_max_len"],
+        "incomplete_desc_rules": {**DEFAULT_RULES["incomplete_desc_rules"],
+                                  **(raw.get("incomplete_desc_rules") or {})},
         "allowed_abbreviations": raw.get("allowed_abbreviations")
                                  or DEFAULT_RULES["allowed_abbreviations"],
     }
@@ -522,6 +575,7 @@ def load_rules(rules_path) -> tuple[dict, str]:
 
 def compile_rules(rules: dict) -> dict:
     """预编译正则/派生数据（启动一次，检测毫秒级）。"""
+    rules.setdefault("meta", {})
     kws = sorted(rules["positive_keywords"], key=len, reverse=True)
     rules["_positive_re"] = re.compile("|".join(re.escape(k) for k in kws)) if kws else re.compile(r"(?!x)x")
     rules["_negative_phrases"] = sorted(set(rules["negative_conclusion_phrases"]), key=len, reverse=True)
@@ -907,6 +961,52 @@ def rule_d_grading(parsed: dict, rules: dict) -> list:
     return issues
 
 
+def rule_d5_grading_system(parsed: dict, rules: dict) -> list:
+    """规则 D5【分级体系与检查部位不符】：分级系统用在错误器官上。
+
+    模板库口径：BI-RADS 用于乳腺/副乳，TI-RADS/C-TIRADS 用于甲状腺，
+    O-RADS 用于卵巢/附件。检查项目属甲器官体系、结论却使用乙体系分级，
+    且全文无乙器官描述时判为分级体系误用（体检等多部位项目不触发）。
+    """
+    conclusion, exam = parsed.get("conclusion", ""), parsed.get("exam_item", "")
+    if not conclusion or not exam:
+        return []
+    cfg = rules.get("grading_systems") or DEFAULT_RULES["grading_systems"]
+
+    def _norm(name: str) -> str:
+        return re.sub(r"[-‐–—]", "-", name.upper())
+
+    sys_group = {_norm(name): group
+                 for group, spec in cfg.items() for name in spec.get("systems", [])}
+    mentioned = {_norm(m.group(0)) for m in GRADING_SYSTEM_MENTION_RE.finditer(conclusion)}
+    groups = {sys_group[n] for n in mentioned if n in sys_group}
+    if not groups:
+        return []
+    # 检查项目明确指向的器官体系（体检等未指明部位的项目不做校验，防误报）
+    exam_groups = {g for g, spec in cfg.items()
+                   if any(o and o in exam for o in spec.get("organs", []))}
+    if not exam_groups:
+        return []
+    full = exam + "\n" + parsed.get("finding", "") + "\n" + conclusion
+    issues = []
+    for group in sorted(groups - exam_groups):
+        spec = cfg.get(group) or {}
+        organs = [o for o in spec.get("organs", []) if o]
+        if any(o in full for o in organs):
+            continue  # 全文确有该体系对应器官（如乳腺+甲状腺联合检查），不判误用
+        used = sorted(n for n in mentioned if sys_group.get(n) == group)
+        expected = sorted({s for eg in exam_groups for s in cfg[eg].get("systems", [])})
+        issues.append({
+            "rule_id": "D", "check": "D5", "rule": "分级不规范", "severity": "medium",
+            "field": "conclusion", "fragment": clip(conclusion),
+            "message": f"检查项目为“{exam}”，结论使用“{used[0]}”分级，"
+                       f"该体系适用于{('、'.join(organs))}；本项目应使用{('、'.join(expected))}分级",
+            "suggestion": f"请核对分级体系：{exam} 应使用{('、'.join(expected))}分级，"
+                          f"避免套用其他部位的 RADS 标准",
+        })
+    return issues
+
+
 # ============================ 质控规则 E/F ============================
 
 def _coverage_aliases(word: str) -> list:
@@ -1045,6 +1145,56 @@ def rule_f_completeness(parsed: dict, rules: dict) -> list:
                 "message": f"空括号“{m.group(0)}”未填写内容",
                 "suggestion": "请填写括号内容或删除空括号",
             })
+
+    # F8: 属性描述缺失（"外形，形态，"后直接跟标点且无描述，句子不完整）
+    idr = rules.get("incomplete_desc_rules") or DEFAULT_RULES["incomplete_desc_rules"]
+    dflt = DEFAULT_RULES["incomplete_desc_rules"]
+    trig_words = idr.get("trigger_words") or dflt["trigger_words"]
+    chain_words = sorted(idr.get("chain_words") or dflt["chain_words"], key=len, reverse=True)
+    enum_words = sorted(set(chain_words) | set(idr.get("enum_words") or dflt["enum_words"]),
+                        key=len, reverse=True)
+    trig_re = re.compile("|".join(re.escape(w) for w in sorted(trig_words, key=len, reverse=True)))
+    for field, txt in (("finding", finding), ("conclusion", conclusion)):
+        if not txt:
+            continue
+        i = 0
+        while True:
+            m = trig_re.search(txt, i)
+            if not m:
+                break
+            chain_start, pos, last_end = m.start(), m.end(), m.end()
+            resolved = False
+            while True:
+                ch = txt[pos] if pos < len(txt) else ""
+                if ch in "，,、；;":
+                    # 顿号为并列枚举，可与更多属性词共享谓语；逗号/分号为分句，仅限核心属性链
+                    pool = enum_words if ch == "、" else chain_words
+                    nxt = txt[pos + 1:]
+                    cw = next((w for w in pool if nxt.startswith(w)), None)
+                    if cw:  # 并列属性链（"外形、形态正常"），共享后续描述
+                        pos += 1 + len(cw)
+                        last_end = pos
+                        continue
+                    break  # 标点后不是并列属性词 → 该链缺描述
+                elif ch in "：:":
+                    after = txt[pos + 1:pos + 2]
+                    if after and after not in "，,、；;：:。.！!？?\n\r）)】]」』":
+                        resolved = True  # "形态：规则"冒号后有描述
+                    break
+                elif ch == "" or ch in "。.！!？?\n\r）)】]」』":
+                    break  # 句末/段末仍无描述 → 不完整
+                else:
+                    resolved = True  # 属性词后直接跟描述内容
+                    break
+            if not resolved:
+                frag = txt[chain_start:last_end]
+                issues.append({
+                    "rule_id": "F", "check": "F8", "rule": "书写规范", "severity": "medium",
+                    "field": field, "fragment": clip(frag),
+                    "message": f"“{frag}”后缺少具体描述，句子不完整",
+                    "suggestion": "请补充该属性的描述（如“外形正常，形态规则”），或删除多余的属性词",
+                })
+            i = max(last_end, m.end())
 
     # F4: 检查项目与内容不符（产科项目无胎儿内容 / 妇科项目出现胎儿内容）
     if exam and finding:
@@ -1446,6 +1596,60 @@ def rule_j_redundancy(parsed: dict, rules: dict) -> list:
     return issues
 
 
+def rule_j5_template_placeholder(parsed: dict, rules: dict) -> list:
+    """规则 J5【模板占位符残留】：模板待填字段未替换即出报告。
+
+    依据院内模板库（明基超声模板重组）的占位符口径：
+      "*侧""*个""*叶"（待选侧别/数量）、"mm×mm""约 mm"（待填测量值）、
+      "低回声/高回声/强回声/混合回声""规则/不规则"（待选描述项）。
+    这些占位符出现在真实报告中，即说明模板文字未删除或未填写。
+    """
+    cfg = rules.get("template_placeholders") or DEFAULT_RULES["template_placeholders"]
+    star_tokens = [t for t in cfg.get("star_tokens", []) if t]
+    empty_tokens = [t for t in cfg.get("empty_measure_tokens", []) if t]
+    slash_tokens = [t for t in cfg.get("slash_options", []) if t]
+    min_parts = int(cfg.get("slash_min_parts", 3))
+    issues = []
+
+    for field in ("finding", "conclusion"):
+        text = parsed.get(field, "")
+        if not text:
+            continue
+        reported = []  # 已报位置，避免同类占位符重叠重复报
+
+        def _add(pos: int, end: int, token: str, hint: str) -> None:
+            if any(abs(pos - p) < 6 for p, _e in reported):
+                return
+            reported.append((pos, end))
+            issues.append({
+                "rule_id": "J", "check": "J5", "rule": "模板文字未删除",
+                "severity": "medium", "field": field,
+                "fragment": clip(text[max(0, pos - 8):end + 8]),
+                "message": f"检出模板占位符“{token}”未替换（{hint}），疑似模板文字未删除",
+                "suggestion": f"请将“{token}”替换为实际{hint}，或删除未使用的模板占位内容",
+            })
+
+        # ① 星号待填项（*侧 / *个 / *叶 / *回声）
+        for token in star_tokens:
+            for m in re.finditer(re.escape(token), text):
+                _add(m.start(), m.end(), token, "侧别/数量/部位")
+        # ② 空测量值（mm×mm / 约 mm / 内膜mm）
+        for token in empty_tokens:
+            for m in re.finditer(re.escape(token), text):
+                _add(m.start(), m.end(), token, "测量数值")
+        # ③ 固定斜杠选项（规则/不规则、低回声/高回声 等）
+        for token in slash_tokens:
+            for m in re.finditer(re.escape(token), text):
+                _add(m.start(), m.end(), token, "具体描述选项")
+        # ④ 括号内多选项未选择（≥ slash_min_parts 个待选项）
+        for m in SLASH_OPTION_BRACKET_RE.finditer(text):
+            seg = m.group(0)
+            if seg.count("/") + 1 < min_parts:
+                continue
+            _add(m.start(), m.end(), seg, "括注中的具体描述")
+    return issues
+
+
 # ============================ 检测入口 ============================
 
 def check_parsed(parsed: dict, rules: dict) -> dict:
@@ -1458,6 +1662,7 @@ def check_parsed(parsed: dict, rules: dict) -> dict:
     issues += rule_c_typos(parsed.get("exam_item", "") + "\n" + parsed["finding"] + "\n" + parsed["conclusion"], rules)
     issues += rule_c_field_missing(parsed)
     issues += rule_d_grading(parsed, rules)
+    issues += rule_d5_grading_system(parsed, rules)
     if not a_fired:  # A 与 E 同向（结论遗漏），已报 A 则不重复提示
         issues += rule_e_coverage(parsed, rules)
     issues += rule_f_completeness(parsed, rules)
@@ -1466,6 +1671,7 @@ def check_parsed(parsed: dict, rules: dict) -> dict:
     issues += rule_h_exam_coverage(parsed, rules)
     issues += rule_i_measurement(parsed, rules)
     issues += rule_j_redundancy(parsed, rules)
+    issues += rule_j5_template_placeholder(parsed, rules)
     # 统一归口：规则 ID 即错误类型名（9 类，名称不可改）；check 保留为内部子项标记
     for iss in issues:
         et = CHECK_ERROR_TYPE.get(iss.get("check") or iss["rule_id"], ERR_OTHER)
@@ -1929,6 +2135,50 @@ _SELFTEST_CASES = [
         "text": ("检查项目：颈动脉彩超\n性别：男 年龄：65岁\n"
                  "超声所见：双侧颈总动脉（CCA、ICA、ECA）内中膜厚度约0.6mm，CDFI：血流频谱形态正常。"
                  "右侧颈内动脉见斑块，大小约2.5*1.6mm。\n超声提示：右侧颈内动脉斑块。\n"),
+        "expect_rules": set(),
+    },
+    {
+        "name": "用例31-属性缺描述句子不完整(F8)→语病或表述不规范",
+        "text": ("检查项目：子宫附件\n性别：女 年龄：49\n"
+                 "超声所见：月经周期第29天，子宫后位，外形，形态，肌层内见多个中低回声团，"
+                 "边界清晰，双侧卵巢未见明显异常。\n超声提示：子宫多发肌瘤。\n"),
+        "expect_rules": {"语病或表述不规范"},
+    },
+    {
+        "name": "用例32-模板星号与空测量占位符(J5)→模板文字未删除",
+        "text": ("检查项目：颈动脉彩超\n性别：男 年龄：65岁\n"
+                 "超声所见：双侧颈总动脉内膜*侧增厚，*侧颈动脉分叉部见斑块，大小约mm×mm。\n"
+                 "超声提示：双侧颈动脉内中膜增厚伴斑块形成。\n"),
+        "expect_rules": {"模板文字未删除"},
+    },
+    {
+        "name": "用例33-斜杠选项未选择(J5)→模板文字未删除",
+        "text": ("检查项目：双侧乳腺超声\n性别：女 年龄：40岁\n"
+                 "超声所见：右侧乳腺见低回声结节，大小约mm×mm，形态（规则/不规则），边界清晰/欠清晰。\n"
+                 "超声提示：右侧乳腺结节（BI-RADS 3类）。\n"),
+        "expect_rules": {"模板文字未删除"},
+    },
+    {
+        "name": "用例34-乳腺分级体系用于甲状腺(D5)→分级不规范",
+        "text": ("检查项目：甲状腺超声\n性别：女 年龄：45岁\n"
+                 "超声所见：甲状腺右叶见低回声结节，边界清晰，CDFI：结节内未见明显血流信号。\n"
+                 "超声提示：甲状腺右叶结节（BI-RADS 3类）。\n"),
+        "expect_rules": {"分级不规范"},
+    },
+    {
+        "name": "用例35-腹部项目缺双肾(H)→遗漏检查部位",
+        "text": ("检查项目：腹部彩超\n性别：男 年龄：50岁\n"
+                 "超声所见：肝脏大小形态正常，实质回声均匀；胆囊壁光滑，腔内未见异常回声；"
+                 "胰腺、脾脏未见明显异常。\n"
+                 "超声提示：肝胆胰脾未见明显异常。\n"),
+        "expect_rules": {"遗漏检查部位"},
+    },
+    {
+        "name": "用例36-完整甲状腺报告不误报(J5/D5 误报回归)",
+        "text": ("检查项目：甲状腺超声\n性别：女 年龄：45岁\n"
+                 "超声所见：甲状腺右叶见低回声结节，大小约0.8*0.6cm，边界清晰，形态规则，"
+                 "CDFI：结节内未见明显血流信号。\n"
+                 "超声提示：甲状腺右叶结节（C-TIRADS 3类）。\n"),
         "expect_rules": set(),
     },
 ]

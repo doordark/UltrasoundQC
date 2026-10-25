@@ -1,0 +1,62 @@
+{
+  "id": "template-placeholder",
+  "name": "10 院内模板占位符适配（规则 D5/H/J5）",
+  "description": "依据院内模板库「明基超声模板重组」口径：模板待填占位符残留（*侧/*个/空 mm×mm/斜杠选项）、分级体系与检查部位错配、腹部检查漏双肾。",
+  "category": "模板规范",
+  "tags": ["模板词库", "D5", "H", "J5"],
+  "expectation": "4 份报告分别命中模板文字未删除 / 分级不规范 / 遗漏检查部位，正常对照 0 误报",
+  "expect_total": 8,
+  "expect_issue_reports": 4,
+  "reports": [
+    {
+      "report_id": "P001",
+      "title": "颈动脉报告-星号与空测量占位符",
+      "expect_rules": ["模板文字未删除"],
+      "exam_item": "颈动脉彩超",
+      "gender": "男",
+      "age": "65岁",
+      "finding": "双侧颈总动脉内中膜*侧增厚，*侧颈动脉分叉部见斑块，大小约mm×mm。",
+      "conclusion": "双侧颈动脉内中膜增厚伴斑块形成。"
+    },
+    {
+      "report_id": "P002",
+      "title": "乳腺报告-空测量值与斜杠选项未选择",
+      "expect_rules": ["模板文字未删除"],
+      "exam_item": "双侧乳腺超声",
+      "gender": "女",
+      "age": "40岁",
+      "finding": "右侧乳腺见低回声结节，大小约mm×mm，形态（规则/不规则），边界清晰/欠清晰，CDFI：未见明显血流信号。",
+      "conclusion": "右侧乳腺结节（BI-RADS 3类）。"
+    },
+    {
+      "report_id": "P003",
+      "title": "甲状腺报告-误用乳腺 BI-RADS 分级",
+      "expect_rules": ["分级不规范"],
+      "exam_item": "甲状腺超声",
+      "gender": "女",
+      "age": "45岁",
+      "finding": "甲状腺右叶见低回声结节，边界清晰，CDFI：结节内未见明显血流信号。",
+      "conclusion": "甲状腺右叶结节（BI-RADS 3类）。"
+    },
+    {
+      "report_id": "P004",
+      "title": "腹部彩超-所见遗漏双肾",
+      "expect_rules": ["遗漏检查部位"],
+      "exam_item": "腹部彩超",
+      "gender": "男",
+      "age": "50岁",
+      "finding": "肝脏大小形态正常，实质回声均匀；胆囊壁光滑，腔内未见异常回声；胰腺、脾脏未见明显异常。",
+      "conclusion": "肝胆胰脾未见明显异常。"
+    },
+    {
+      "report_id": "P005",
+      "title": "正常对照-甲状腺完整报告（零误报）",
+      "expect_rules": [],
+      "exam_item": "甲状腺超声",
+      "gender": "女",
+      "age": "45岁",
+      "finding": "甲状腺右叶见低回声结节，大小约0.8*0.6cm，边界清晰，形态规则，CDFI：结节内未见明显血流信号。",
+      "conclusion": "甲状腺右叶结节（C-TIRADS 3类）。"
+    }
+  ]
+}
