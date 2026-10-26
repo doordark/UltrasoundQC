@@ -1,6 +1,6 @@
 # Ultrasound QC Engine — 离线超声报告自动勘误与质控引擎
 
-轻量级本地质控引擎（**v1.3.0**）：读取 `rules.json` 规则库，对超声报告执行 9 类质控规则检查
+轻量级本地质控引擎（**v1.3.2**）：读取 `rules.json` 规则库，对超声报告执行 9 类质控规则检查
 （描述与结论不一致 / 分级不规范 / 语病或表述不规范 / 数据或单位错误 / 错别字或字段缺失 /
 模板文字未删除 / 遗漏检查部位 / 其他 / 性别年龄冲突）。输入支持**标准 JSON 报告对象**（工作站集成规范）
 与报告文本（兼容旧版 PACS 导出）。
@@ -30,7 +30,7 @@ Windows 电脑（Win7/Win10，32/64 位），供 PACS/报告系统对接。
 python qc_engine.py selftest        # 或双击运行: UltrasoundQCEngine-CLI.exe selftest
 ```
 
-36 个内置用例覆盖 9 类质控规则、标准 JSON 输入与院内模板占位符口径，全部输出 PASS 即部署正常。
+38 个内置用例覆盖 9 类质控规则、标准 JSON 输入与院内模板占位符口径，全部输出 PASS 即部署正常。
 
 ### 1.2 命令行批量检测
 
@@ -174,6 +174,10 @@ curl.exe -s -X POST -H "Content-Type: application/json" --data-binary "@body.jso
 > J 已对齐院内模板库「明基超声模板重组.xlsx」的占位符口径：`*侧`/`*个`/`*叶`、
 > 空测量值 `mm×mm`/`约 mm`、斜杠选项未选择（`低回声/高回声/强回声/混合回声`、`规则/不规则`）等
 > 均报「模板文字未删除」，词表可通过 `rules.json` 的 `template_placeholders` 现场调整。
+> 正文夹带与报告无关的杂字（如"管腔无明显狭窄，卡了，CDFI"）报「其他」，
+> 词表见 `rules.json` 的 `stray_fragments`；仅匹配被标点独立包裹的片段，"卡了鱼刺"等正常描述不误报。
+> 口语化用词（"高回声超级大斑块""好大"）报「语病或表述不规范」，
+> 词表见 `rules.json` 的 `non_standard_terms`（键为口语表述，值为规范写法建议）。
 
 **标准 JSON 输入**（工作站集成规范）：`POST /api/check` 直接接收
 `{"exam_item":"检查项目","gender":"性别","age":"年龄","finding":"超声所见","conclusion":"超声提示"}`，

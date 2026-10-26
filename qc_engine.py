@@ -32,7 +32,9 @@ Windows 环境（Win7/Win10, 32/64 位）设计，可由 PyInstaller 打包为�
     H 所见遗漏检查部位: 检查项目要求多个部位（如肝胆胰脾），所见缺少部分器官描述
     I 数据与单位异常  : 测量值单位错误/缺失、未删测量值占位符、径线量纲异常（疑似小数点错）
     J 语句重复        : 叠词重复（如"大小大小"）/ 整句模板重复冗余未删除；
-                       模板占位符残留（"*侧""*个""mm×mm""低回声/高回声/强回声"等）
+                       模板占位符残留（"*侧""*个""mm×mm""低回声/高回声/强回声"等）；
+                       与报告无关的杂字混入正文（如"卡了""待删"）；
+                       非规范口语化用词（如"超级大斑块""好大"）
 """
 
 from __future__ import annotations
@@ -50,7 +52,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from xml.sax.saxutils import escape
 
-ENGINE_VERSION = "1.3.0"
+ENGINE_VERSION = "1.3.2"
 MAX_BODY_BYTES = 8 * 1024 * 1024  # HTTP 请求体上限 8MB
 
 # ============================ 质控规则（9 类错误类型，名称不可改动） ============================
@@ -84,7 +86,8 @@ CHECK_ERROR_TYPE = {
     "I": ERR_DATA_UNIT, "I1": ERR_DATA_UNIT, "I2": ERR_DATA_UNIT, "I3": ERR_DATA_UNIT,
     "I4": ERR_DATA_UNIT, "I5": ERR_DATA_UNIT, "I6": ERR_DATA_UNIT, "I7": ERR_DATA_UNIT,
     "J1": ERR_WORDING, "J2": ERR_TEMPLATE_LEFT, "J3": ERR_TEMPLATE_LEFT,
-    "J4": ERR_TEMPLATE_LEFT, "J5": ERR_TEMPLATE_LEFT,
+    "J4": ERR_TEMPLATE_LEFT, "J5": ERR_TEMPLATE_LEFT, "J6": ERR_OTHER,
+    "J7": ERR_WORDING,
 }
 
 # ============================ 内置默认规则（rules.json 缺失时兜底） ============================
@@ -195,6 +198,16 @@ DEFAULT_RULES = {
     "stale_fragments": ["未了", "不完整", "未填", "未填写", "待补", "待填", "待查",
                         "此处填写", "见上", "同上", "？？", "??", "xx", "XX"],
     "stale_max_len": 8,                   # 括号内超过该长度的视为正常括注，不判残留
+    # 规则 J6：非报告内容混入（夹在逗号/句号之间的孤立杂字，如"，卡了，"）
+    # 仅匹配被标点独立包裹的片段，"卡了鱼刺"等正常描述不误报；院内可自行增删
+    "stray_fragments": ["卡了", "待删", "删掉", "未完", "哈哈", "复制粘贴", "TODO", "TBD"],
+    # 规则 J7：非规范口语化用词（"超级大斑块""好大"），归「语病或表述不规范」
+    "non_standard_terms": {
+        "超级大": "明显增大", "超级": "（删除口语化副词）",
+        "超大": "明显增大", "特大": "明显增大", "非常大": "明显增大", "特别大": "明显增大",
+        "好大": "较大", "挺大": "较大", "很大": "较大", "贼大": "较大", "太大": "较大",
+        "差不多": "相近",
+    },
     # 规则 F8：属性描述缺失（"外形，形态，"后无任何描述，句子不完整）
     # trigger_words 命中后紧跟标点/句末且无描述即报；chain_words 为逗号分句中可共享
     # 后续描述的并列属性词（"外形，形态正常"不报），enum_words 为顿号并列可共享谓语的
@@ -303,6 +316,8 @@ DUP_WORD_ALLOW = {"常常", "渐渐", "看看", "谢谢", "宝宝", "娃娃", "�
                   "时时", "处处", "往往", "爷爷", "奶奶", "哥哥", "姐姐", "弟弟", "妹妹"}
 SENT_SPLIT_RE = re.compile(r"[。；;！？!?\n]+")
 SENT_NORM_RE = re.compile(r"[\s，,、：:（）()【】\[\]“”\"'·\-—_]+")
+# 规则 J6 独立片段判定：杂字前后须为标点、括号或句首尾
+STRAY_DELIMS = set("，。；：、,.;:!?！？（）()【】《》\"'“”‘’ \t\n\r")
 # 部位主语短语（供 J2 矛盾重复判定部位一致性）：如"双侧腋窝""左侧颈总动脉""右乳"
 SITE_PHRASE_RE = re.compile(
     r"((?:双侧|左侧|右侧|左|右)?[一-龥]{1,4}(?:动脉|静脉|窝|叶|腺|肌|管|部|区|支|段|乳))")
@@ -565,6 +580,8 @@ def load_rules(rules_path) -> tuple[dict, str]:
         "redundancy_rules": {**DEFAULT_RULES["redundancy_rules"], **(raw.get("redundancy_rules") or {})},
         "stale_fragments": raw.get("stale_fragments") or DEFAULT_RULES["stale_fragments"],
         "stale_max_len": raw.get("stale_max_len") or DEFAULT_RULES["stale_max_len"],
+        "stray_fragments": raw.get("stray_fragments") or DEFAULT_RULES["stray_fragments"],
+        "non_standard_terms": raw.get("non_standard_terms") or DEFAULT_RULES["non_standard_terms"],
         "incomplete_desc_rules": {**DEFAULT_RULES["incomplete_desc_rules"],
                                   **(raw.get("incomplete_desc_rules") or {})},
         "allowed_abbreviations": raw.get("allowed_abbreviations")
@@ -1650,6 +1667,64 @@ def rule_j5_template_placeholder(parsed: dict, rules: dict) -> list:
     return issues
 
 
+def rule_j6_stray_text(parsed: dict, rules: dict) -> list:
+    """规则 J6【非报告内容混入】：正文夹带与病情描述无关的杂字。
+
+    仅匹配被标点/括号/句首尾独立包裹的片段（如"管腔无明显狭窄，卡了，CDFI"），
+    "卡了鱼刺"这类完整描述不会命中；词表见 rules.json 的 stray_fragments。
+    """
+    words = [w for w in (rules.get("stray_fragments") or DEFAULT_RULES["stray_fragments"]) if w]
+    issues = []
+    for field in ("finding", "conclusion"):
+        text = parsed.get(field, "")
+        if not text:
+            continue
+        for w in words:
+            for m in re.finditer(re.escape(w), text):
+                before = text[m.start() - 1] if m.start() > 0 else ""
+                after = text[m.end()] if m.end() < len(text) else ""
+                if (before and before not in STRAY_DELIMS) or (after and after not in STRAY_DELIMS):
+                    continue  # 紧邻其他文字，属正常描述的一部分
+                issues.append({
+                    "rule_id": "J", "check": "J6", "rule": "其他", "severity": "medium",
+                    "field": field, "fragment": clip(text[max(0, m.start() - 8):m.end() + 8]),
+                    "message": f"正文中混入与报告无关的文字“{w}”，不属于诊断描述内容",
+                    "suggestion": f"请删除无关文字“{w}”，保留完整的超声描述语句",
+                })
+    return issues
+
+
+def rule_j7_nonstandard_wording(parsed: dict, rules: dict) -> list:
+    """规则 J7【非规范口语化用词】：报告中使用"超级大""好大"等口语表述。
+
+    口语化修饰语不具备诊断描述性，规范写法应为"较大/明显增大"等；
+    长词优先匹配并跳过重叠区间（"超级大"不再重复报"超级"）。
+    """
+    terms = rules.get("non_standard_terms") or DEFAULT_RULES["non_standard_terms"]
+    issues = []
+    for field in ("finding", "conclusion"):
+        text = parsed.get(field, "")
+        if not text:
+            continue
+        taken = []
+        for term in sorted(terms, key=len, reverse=True):
+            if not term:
+                continue
+            for m in re.finditer(re.escape(term), text):
+                if any(m.start() < e and m.end() > s for s, e in taken):
+                    continue
+                taken.append((m.start(), m.end()))
+                fix = terms.get(term) or "规范描述"
+                issues.append({
+                    "rule_id": "J", "check": "J7", "rule": "语病或表述不规范",
+                    "severity": "medium", "field": field,
+                    "fragment": clip(text[max(0, m.start() - 8):m.end() + 8]),
+                    "message": f"使用口语化用词“{term}”，不符合超声报告书写规范",
+                    "suggestion": f"请将“{term}”改为规范表述（建议改为“{fix}”）",
+                })
+    return issues
+
+
 # ============================ 检测入口 ============================
 
 def check_parsed(parsed: dict, rules: dict) -> dict:
@@ -1672,6 +1747,8 @@ def check_parsed(parsed: dict, rules: dict) -> dict:
     issues += rule_i_measurement(parsed, rules)
     issues += rule_j_redundancy(parsed, rules)
     issues += rule_j5_template_placeholder(parsed, rules)
+    issues += rule_j6_stray_text(parsed, rules)
+    issues += rule_j7_nonstandard_wording(parsed, rules)
     # 统一归口：规则 ID 即错误类型名（9 类，名称不可改）；check 保留为内部子项标记
     for iss in issues:
         et = CHECK_ERROR_TYPE.get(iss.get("check") or iss["rule_id"], ERR_OTHER)
@@ -2180,6 +2257,22 @@ _SELFTEST_CASES = [
                  "CDFI：结节内未见明显血流信号。\n"
                  "超声提示：甲状腺右叶结节（C-TIRADS 3类）。\n"),
         "expect_rules": set(),
+    },
+    {
+        "name": "用例37-正文混入无关杂字“卡了”(J6)→其他",
+        "text": ("检查项目：颈动脉彩超\n性别：男 年龄：65岁\n"
+                 "超声所见：双侧颈总动脉内径正常，内膜平整，管腔无明显狭窄，卡了，"
+                 "CDFI：血流频谱形态正常。\n"
+                 "超声提示：双侧颈动脉未见明显异常。\n"),
+        "expect_rules": {"其他"},
+    },
+    {
+        "name": "用例38-口语化用词“超级大斑块”(J7)→语病或表述不规范",
+        "text": ("检查项目：颈动脉彩超\n性别：男 年龄：65岁\n"
+                 "超声所见：左侧颈总动脉分叉处见大小约0.6*0.2cm高回声超级大斑块，"
+                 "管腔无明显狭窄。\n"
+                 "超声提示：左侧颈动脉斑块形成。\n"),
+        "expect_rules": {"语病或表述不规范"},
     },
 ]
 
