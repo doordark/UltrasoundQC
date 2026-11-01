@@ -27,4 +27,4 @@ CORS_ORIGINS = [
 MAX_UPLOAD_BYTES = int(os.environ.get("QC_MAX_UPLOAD_BYTES", str(20 * 1024 * 1024)))
 MAX_REPORTS_PER_BATCH = int(os.environ.get("QC_MAX_REPORTS_PER_BATCH", "5000"))
 
-SUPPORTED_EXTS = {".txt", ".md", ".json", ".csv", ".tsv", ".xlsx"}
+SUPPORTED_EXTS = {".txt", ".md", ".json", ".csv", ".tsv", ".xlsx", ".pdf"}

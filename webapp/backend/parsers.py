@@ -1,6 +1,7 @@
-"""上传文件解析：支持 .txt/.md/.json/.csv/.tsv/.xlsx，统一产出标准五字段报告列表。
+"""上传文件解析：支持 .txt/.md/.json/.csv/.tsv/.xlsx/.pdf，统一产出标准五字段报告列表。
 
-零第三方依赖：xlsx 为 zip+xml 手工解析（兼容 Excel/WPS 导出的 sharedStrings 与内联字符串）。
+零第三方依赖：xlsx 为 zip+xml 手工解析（兼容 Excel/WPS 导出的 sharedStrings 与内联字符串）；
+pdf 为自研对象流解析（FlateDecode 解压 + ToUnicode CMap 还原中文）。
 """
 from __future__ import annotations
 
@@ -12,7 +13,7 @@ import zipfile
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-from . import config
+from . import config, pdf_parser
 from .engine_adapter import engine, normalize_report
 
 _SSML_NS = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
@@ -127,7 +128,11 @@ def _xlsx_first_sheet_rows(data: bytes, warnings: list) -> list[list[str]]:
 # ============================ TXT / MD ============================
 
 def parse_txt_bytes(data: bytes, warnings: list) -> list[dict]:
-    text = engine.read_text_any(data)
+    return parse_text_str(engine.read_text_any(data), warnings)
+
+
+def parse_text_str(text: str, warnings: list) -> list[dict]:
+    """按分隔行/空行切块，逐块解析为标准报告（txt/md/pdf 共用）。"""
     lines = text.splitlines()
     has_delim = any(_DELIM_RE.match(ln) for ln in lines)
     if has_delim:
@@ -162,6 +167,19 @@ def parse_txt_bytes(data: bytes, warnings: list) -> list[dict]:
             "conclusion": parsed["conclusion"],
         })
     return reports
+
+
+# ============================ PDF ============================
+
+def parse_pdf_bytes(data: bytes, warnings: list) -> list[dict]:
+    """PDF 文本层提取后，按文本报告规则解析（每页对应一份报告）。"""
+    pages, pdf_warnings = pdf_parser.extract_pages(data)
+    warnings.extend(pdf_warnings)
+    if not pages:
+        raise ValueError(
+            "PDF 中未提取到文本（可能为扫描图片件），请导出带文本层的 PDF 或改用 .txt/.docx"
+        )
+    return parse_text_str("\n\n".join(pages), warnings)
 
 
 def _text_to_report(text: str) -> dict | None:
@@ -236,6 +254,9 @@ def parse_upload(filename: str, data: bytes) -> dict:
             raise ValueError("xlsx 工作表为空")
         reports = _rows_to_reports(rows, warnings)
         fmt = "xlsx"
+    elif ext == ".pdf":
+        reports = parse_pdf_bytes(data, warnings)
+        fmt = "pdf"
     else:
         reports = parse_txt_bytes(data, warnings)
         fmt = "txt"

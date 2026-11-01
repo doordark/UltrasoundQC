@@ -289,6 +289,26 @@ a {
   padding-left: 18px;
 }
 
+/* 文本录入测试：大文本编辑框 */
+.text-input {
+  width: 100%;
+  min-height: 220px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 13.5px;
+  line-height: 1.75;
+  resize: vertical;
+}
+.text-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
 /* ================= 表格 ================= */
 .table-wrap {
   overflow-x: auto;

@@ -28,6 +28,7 @@
 
     <nav class="tab-nav">
       <button class="tab-btn active" data-tab="upload">上传纠错</button>
+      <button class="tab-btn" data-tab="manual">文本录入测试</button>
       <button class="tab-btn" data-tab="datasets">测试数据集</button>
       <button class="tab-btn" data-tab="help">帮助与接口</button>
     </nav>
@@ -43,7 +44,7 @@
               id="fileInput"
               hidden
               multiple
-              accept=".txt,.md,.json,.csv,.tsv,.xlsx"
+              accept=".txt,.md,.json,.csv,.tsv,.xlsx,.pdf"
             />
             <div class="dz-icon">
               <svg
@@ -68,7 +69,7 @@
             <p class="dz-title">点击选择文件，或将文件拖拽到此处</p>
             <p class="dz-sub">
               支持
-              <b>.txt / .md / .json / .csv / .tsv / .xlsx</b>，可一次选择/拖拽
+              <b>.txt / .md / .json / .csv / .tsv / .xlsx / .pdf</b>，可一次选择/拖拽
               <b>多个文件</b>（最多 20 个），单文件最大 20MB
             </p>
             <p class="dz-sub dim">
@@ -77,7 +78,8 @@
               >
               · <a href="samples/sample_reports.csv" download>CSV 样例</a> ·
               <a href="samples/sample_reports.txt" download>TXT 样例</a> ·
-              <a href="samples/sample_reports.xlsx" download>XLSX 样例</a>
+              <a href="samples/sample_reports.xlsx" download>XLSX 样例</a> ·
+              <a href="samples/sample_reports.pdf" download>PDF 样例</a>
             </p>
           </div>
           <div id="fileInfo" class="file-info hidden"></div>
@@ -122,6 +124,57 @@
         </div>
 
         <div id="uploadResult"></div>
+      </section>
+
+      <!-- ================= 文本录入测试 ================= -->
+      <section id="tab-manual" class="tab-panel">
+        <div class="card">
+          <h2><span class="step-no">1</span>直接输入 / 修改报告文本</h2>
+          <p class="section-desc">
+            无需上传文件，直接粘贴报告原文（或在上方文本框中修改后重新识别），点击「识别并纠错」即可看到解析结果与质控问题，便于快速迭代测试规则。
+          </p>
+          <textarea
+            id="manualText"
+            class="text-input"
+            spellcheck="false"
+            placeholder="检查项目：甲状腺彩超&#10;性别：女&#10;年龄：44岁&#10;超声所见：甲状腺右叶见一大小约1.2cm×0.9cm低回声结节，边界清，形态规则。&#10;超声提示：甲状腺未见明显异常。&#10;&#10;（多份报告可用空行或 ------ 分隔）"
+          ></textarea>
+          <div class="btn-row" style="margin-top: 12px">
+            <button id="manualCheckBtn" class="btn-primary">识别并纠错</button>
+            <button id="manualParseBtn" class="btn-ghost">仅识别文本</button>
+            <button id="manualSampleBtn" class="btn-ghost">载入示例文本</button>
+            <button id="manualClearBtn" class="btn-ghost">清空</button>
+          </div>
+          <div id="manualWarn" class="warn-box hidden"></div>
+          <p class="hint" id="manualHint">
+            文本会按「检查项目：」「超声所见：」「超声提示：」等标签行识别；无标签时全文按超声所见处理。
+          </p>
+        </div>
+
+        <div class="card hidden" id="manualPreviewCard">
+          <h2>
+            <span class="step-no">2</span>识别结果预览
+            <span class="h-sub" id="manualPreviewCount"></span>
+          </h2>
+          <div class="table-wrap">
+            <table class="data-table" id="manualPreviewTable">
+              <thead>
+                <tr>
+                  <th>报告ID</th>
+                  <th>来源</th>
+                  <th>检查项目</th>
+                  <th>性别</th>
+                  <th>年龄</th>
+                  <th>超声所见</th>
+                  <th>超声提示</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div id="manualResult"></div>
       </section>
 
       <!-- ================= 测试数据集 ================= -->
@@ -188,6 +241,12 @@
                     >）或空行分隔；每份报告内使用「检查项目：」「超声所见：」「超声提示：」等标签行，无标签时全文按超声所见处理。
                   </td>
                 </tr>
+                <tr>
+                  <td><b>PDF</b></td>
+                  <td>
+                    提取 PDF 文本层后按文本规则解析，<b>每页对应一份报告</b>；自动还原中文折行。仅支持<b>带文本层</b>的 PDF（默认导出即可）；<b>加密 PDF</b>与<b>纯扫描图片件</b>（无文本层、需 OCR）不支持，请另存为文本层 PDF 或改用 .txt/.docx。
+                  </td>
+                </tr>
               </tbody>
             </table>
           </div>
@@ -202,9 +261,13 @@
             </li>
             <li>
               <b>上传演示：</b
-              >在「上传纠错」页签下载页面顶部的样例文件（JSON/CSV/TXT/XLSX
+              >在「上传纠错」页签下载页面顶部的样例文件（JSON/CSV/TXT/XLSX/PDF
               任一）→ 上传（可一次选多个文件）→ 预览解析结果 →
               点击「开始纠错」。
+            </li>
+            <li>
+              <b>文本录入测试：</b>切换到「文本录入测试」页签 → 点击「载入示例文本」或直接粘贴报告
+              → 「识别并纠错」；修改文本框内容后可随时重新识别，用于快速验证规则与文本识别效果。
             </li>
             <li>
               <b>预期效果：</b>「正常报告集」应检出 0
@@ -286,6 +349,16 @@
                   <td>POST</td>
                   <td><code>/api/upload/check</code></td>
                   <td>上传 → 解析 → 纠错，单请求返回完整结果</td>
+                </tr>
+                <tr>
+                  <td>POST</td>
+                  <td><code>/api/text/parse</code></td>
+                  <td>直接识别粘贴的报告文本（只解析，不纠错）</td>
+                </tr>
+                <tr>
+                  <td>POST</td>
+                  <td><code>/api/text/check</code></td>
+                  <td>文本 → 识别 → 纠错，便于边改文本边测试规则</td>
                 </tr>
               </tbody>
             </table>

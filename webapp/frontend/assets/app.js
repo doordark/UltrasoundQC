@@ -198,7 +198,10 @@ async function handleFiles(fileList) {
 function renderPreview(reports) {
   $("#previewCard").classList.remove("hidden");
   $("#previewCount").textContent = `共 ${reports.length} 份`;
-  const tbody = $("#previewTable tbody");
+  fillPreviewRows($("#previewTable tbody"), reports);
+}
+
+function fillPreviewRows(tbody, reports) {
   tbody.innerHTML = reports
     .map(
       (r) => `
@@ -253,6 +256,117 @@ $("#resetUploadBtn").addEventListener("click", () => {
   $("#runUploadBtn").disabled = true;
   $("#uploadHint").textContent = "请先上传数据文件，解析成功后即可执行纠错。";
   setUploadStepper(-1);
+});
+
+/* ================= 文本录入测试 ================= */
+const MANUAL_SAMPLE = `检查项目：甲状腺彩超
+性别：女
+年龄：44岁
+超声所见：甲状腺右叶见一大小约1.2cm×0.9cm低回声结节，边界清，形态规则。
+超声提示：甲状腺未见明显异常。
+------------------------------
+检查项目：乳腺彩超
+性别：女
+年龄：38岁
+超声所见：左乳见一低回声结节，大小约0.8cm×0.6cm，边界清，形态规则。
+超声提示：右乳结节，考虑纤维腺瘤可能，建议随访。`;
+
+const manualState = { reports: [], warnings: [] };
+
+function showManualWarnings(warnings) {
+  const box = $("#manualWarn");
+  if (warnings.length) {
+    box.classList.remove("hidden");
+    box.innerHTML = `<b>解析提示（${warnings.length} 条）</b><ul>${warnings
+      .map((w) => `<li>${esc(w)}</li>`)
+      .join("")}</ul>`;
+  } else {
+    box.classList.add("hidden");
+    box.innerHTML = "";
+  }
+}
+
+function renderManualPreview(reports) {
+  $("#manualPreviewCard").classList.remove("hidden");
+  $("#manualPreviewCount").textContent = `共 ${reports.length} 份`;
+  fillPreviewRows($("#manualPreviewTable tbody"), reports);
+}
+
+function readManualText() {
+  const text = $("#manualText").value;
+  if (!text.trim()) {
+    toast("请先输入报告文本", "error");
+    return null;
+  }
+  return text;
+}
+
+async function manualParse() {
+  const text = readManualText();
+  if (!text) return;
+  try {
+    const data = await fetchJSON("/api/text/parse", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+    });
+    manualState.reports = data.reports;
+    manualState.warnings = data.warnings || [];
+    showManualWarnings(manualState.warnings);
+    renderManualPreview(data.reports);
+    $("#manualHint").textContent =
+      `识别完成：${data.report_count} 份报告，点击「识别并纠错」执行质控。`;
+    toast(`识别完成：${data.report_count} 份报告`, "success");
+  } catch (e) {
+    $("#manualHint").textContent = "文本识别失败，请检查文本格式。";
+    toast(e.message, "error");
+  }
+}
+
+async function manualCheck() {
+  const text = readManualText();
+  if (!text) return;
+  const btn = $("#manualCheckBtn");
+  btn.disabled = true;
+  $("#manualHint").textContent = "正在识别并执行纠错…";
+  $("#manualResult").innerHTML = "";
+  try {
+    const data = await fetchJSON("/api/text/check", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+    });
+    manualState.reports = data.reports;
+    manualState.warnings = data.warnings || [];
+    showManualWarnings(manualState.warnings);
+    renderManualPreview(data.reports);
+    renderResult($("#manualResult"), data, "手工输入文本");
+    $("#manualHint").textContent =
+      `纠错完成：${data.summary.issue_total} 条问题 / ${data.summary.total} 份报告；修改上方文本后可再次点击重新识别。`;
+    toast("纠错完成", "success");
+  } catch (e) {
+    $("#manualHint").textContent = "识别或纠错失败，请检查文本格式后重试。";
+    toast(e.message, "error");
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+$("#manualParseBtn").addEventListener("click", manualParse);
+$("#manualCheckBtn").addEventListener("click", manualCheck);
+$("#manualSampleBtn").addEventListener("click", () => {
+  $("#manualText").value = MANUAL_SAMPLE;
+  $("#manualHint").textContent = "已载入示例文本，可直接点「识别并纠错」。";
+});
+$("#manualClearBtn").addEventListener("click", () => {
+  $("#manualText").value = "";
+  manualState.reports = [];
+  manualState.warnings = [];
+  $("#manualPreviewCard").classList.add("hidden");
+  $("#manualWarn").classList.add("hidden");
+  $("#manualResult").innerHTML = "";
+  $("#manualHint").textContent =
+    "文本会按「检查项目：」「超声所见：」「超声提示：」等标签行识别；无标签时全文按超声所见处理。";
 });
 
 /* ================= 测试数据集 ================= */

@@ -7,7 +7,8 @@ Web 端数据纠错系统：**前后端分离**架构，支持常见格式文件
 | 特性           | 说明                                                              |
 | -------------- | ----------------------------------------------------------------- |
 | 前后端分离     | 后端 REST API（FastAPI）+ 原生 HTML/CSS/JS 前端，接口完全适配     |
-| 多格式上传     | `.txt / .md / .json / .csv / .tsv / .xlsx` 自动解析               |
+| 多格式上传     | `.txt / .md / .json / .csv / .tsv / .xlsx / .pdf` 自动解析         |
+| 文本录入测试   | 页面直接粘贴/修改报告文本，一键识别并纠错，便于快速验证规则       |
 | 一键纠错       | 上传 → 解析 → 纠错全流程可视化，步骤条实时状态提示                |
 | 预置测试数据集 | 10 组标准数据集覆盖 9 类全部规则与院内模板口径，点击即检         |
 | 结果清晰直观   | 汇总统计卡片 + 规则分布 + 问题卡片（原文片段/修改建议）+ 报告明细 |
@@ -48,14 +49,15 @@ webapp/
 ├── backend/                # 后端服务
 │   ├── main.py             # FastAPI 应用与 REST 接口
 │   ├── engine_adapter.py   # 质控引擎加载与批量纠错封装
-│   ├── parsers.py          # 上传文件解析（txt/json/csv/tsv/xlsx，零第三方依赖）
+│   ├── parsers.py          # 上传文件解析（txt/json/csv/tsv/xlsx/pdf，零第三方依赖）
+│   ├── pdf_parser.py       # PDF 文本层提取（对象流/FlateDecode/ToUnicode，纯标准库）
 │   ├── datasets.py         # 预置测试数据集加载
 │   ├── config.py           # 运行配置（环境变量）
 │   └── datasets/           # 预置测试数据集（JSON，可自行增删）
 ├── frontend/               # 前端静态页面（原生 JS，无构建步骤）
 │   ├── index.html
 │   └── assets/             # styles.css / app.js
-├── samples/                # 上传演示样例文件（json/csv/txt/xlsx 各 5 份报告）
+├── samples/                # 上传演示样例文件（json/csv/txt/xlsx/pdf 各 5 份报告）
 └── deploy/                 # Linux 生产部署
     ├── deploy.sh           # 一键部署脚本（venv + 依赖 + systemd + nginx）
     ├── qc-web.service      # systemd 服务单元模板
@@ -143,16 +145,30 @@ venv/bin/uvicorn backend.main:app --host 0.0.0.0 --port 8000
 
 ### 4.2 上传样例文件测试
 
-「上传纠错」页签顶部提供 4 种格式的样例文件下载（各含 5 份报告）：
+「上传纠错」页签顶部提供 5 种格式的样例文件下载（各含 5 份报告）：
 
 | 样例文件              | 格式特点                               | 预期结果                        |
 | --------------------- | -------------------------------------- | ------------------------------- |
 | `sample_reports.json` | `{"reports": [...]}` 包装的标准 JSON   | 解析 5 份，检出 4 条（A/B/C/H） |
-| `sample_reports.csv`  | 表头行 + 每行一份报告                  | 同上（四种格式结果一致）        |
+| `sample_reports.csv`  | 表头行 + 每行一份报告                  | 同上（五种格式结果一致）        |
 | `sample_reports.xlsx` | Excel 表格，首行表头                   | 同上                            |
 | `sample_reports.txt`  | 标签行 + `------` 分隔行的多份文本报告 | 同上                            |
+| `sample_reports.pdf`  | 带文本层 PDF，每页一份报告             | 同上                            |
 
 操作步骤：上传文件 → 查看解析预览 → 点击「**开始纠错**」→ 查看结果卡片与报告明细。
+
+### 4.2.1 文本录入测试
+
+「文本录入测试」页签可跳过文件，直接在页面文本框中粘贴或修改报告文本：
+
+- 「**识别并纠错**」：文本 → 识别 → 纠错一步完成，同时展示识别预览与纠错结果；
+- 「**仅识别文本**」：只解析不纠错，用于核对「检查项目/超声所见/超声提示」等字段是否识别正确；
+- 「**载入示例文本**」「**清空**」：快速填充样例或重置。
+
+文本识别规则与 `.txt/.pdf` 完全一致：多份报告用空行或 `------` 分隔，字段使用
+「检查项目：」「超声所见：」「超声提示：」等标签行。对应接口为
+`POST /api/text/parse`（只解析）与 `POST /api/text/check`（解析并纠错），请求体均为
+`{"text": "报告全文"}`。
 
 ### 4.3 常用自测命令（curl）
 
@@ -176,6 +192,7 @@ curl -X POST -F "file=@webapp/samples/sample_reports.csv" \
 | **CSV/TSV** | 首行为表头，列名使用标准字段名或中文键名自动映射；每行一份报告                                          |
 | **XLSX**    | Excel/WPS 工作表，首行为表头（列名同 CSV），仅解析第一个工作表；无需安装 openpyxl（内置轻量解析）       |
 | **TXT/MD**  | 多份报告按分隔行（`------` 等）或空行分隔；每份内使用「检查项目：」「超声所见：」「超声提示：」等标签行 |
+| **PDF**     | 提取文本层后按 TXT 规则解析，每页对应一份报告，自动还原中文折行；仅支持带文本层 PDF，加密件与纯扫描图片件（无文本层）不支持 |
 
 **标准字段**（兼容中文键名与常见大小写变体）：
 
@@ -205,6 +222,8 @@ Base URL：`http://<服务器>:<端口>`；请求/响应均为 JSON（上传接�
 | POST | `/api/export`              | 导出纠错结果为 Excel（质控概览 + 错误明细） |
 | POST | `/api/upload`              | 上传并解析一个或多个文件（不纠错，供预览）  |
 | POST | `/api/upload/check`        | 上传 → 解析 → 纠错，单请求返回完整结果      |
+| POST | `/api/text/parse`          | 直接识别粘贴的报告文本（只解析，不纠错）    |
+| POST | `/api/text/check`          | 文本 → 识别 → 纠错，便于边改边测            |
 
 ### 6.2 POST /api/check — 单份报告纠错
 
@@ -441,7 +460,7 @@ tail -f /opt/qc-web/logs/qc-web.log
 A：引擎需位于 `webapp/` 同级目录（或通过 `QC_ENGINE_FILE` 指定路径）；`deploy.sh` 会自动复制。
 
 **Q：上传报 400「不支持的文件类型」？**
-A：仅支持 `.txt/.md/.json/.csv/.tsv/.xlsx`；请检查文件扩展名是否正确。
+A：仅支持 `.txt/.md/.json/.csv/.tsv/.xlsx/.pdf`；请检查文件扩展名是否正确。
 
 **Q：修改了 rules.json 为什么不生效？**
 A：规则在启动时加载，修改后需 `systemctl restart qc-web` 重启服务。

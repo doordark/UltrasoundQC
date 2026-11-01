@@ -158,6 +158,61 @@ def check_batch(payload: dict = Body(...)):
     return {"ok": True, "source": {"type": "inline"}, "warnings": warnings, **batch}
 
 
+# ============================ 文本录入测试 ============================
+
+MANUAL_TEXT_MAX_CHARS = 200_000  # 手工文本上限（约 20 万字）
+
+
+def _parse_manual_text(payload: dict) -> tuple[list[dict], list[str]]:
+    """手工文本 → 标准报告列表（与 txt/pdf 共用同一识别规则）。"""
+    text = payload.get("text")
+    if not isinstance(text, str) or not text.strip():
+        raise HTTPException(status_code=400, detail="请提供 text 文本内容")
+    if len(text) > MANUAL_TEXT_MAX_CHARS:
+        raise HTTPException(
+            status_code=413,
+            detail=f"文本过长（上限 {MANUAL_TEXT_MAX_CHARS} 字符），请分批提交",
+        )
+    warnings: list[str] = []
+    reports = parsers.parse_text_str(text, warnings)
+    if not reports:
+        raise HTTPException(
+            status_code=400,
+            detail="未识别到报告内容：请确认文本含「超声所见：」「超声提示：」等标签行，"
+                   "多份报告用空行或 ------ 分隔",
+        )
+    for rep in reports:
+        rep["source_file"] = "手工输入"
+    return reports, warnings
+
+
+@app.post("/api/text/parse")
+def text_parse(payload: dict = Body(...)):
+    """文本录入：直接识别粘贴的报告文本（只解析，不纠错）。"""
+    reports, warnings = _parse_manual_text(payload)
+    return {
+        "ok": True,
+        "format": "txt",
+        "report_count": len(reports),
+        "reports": reports,
+        "warnings": warnings,
+    }
+
+
+@app.post("/api/text/check")
+def text_check(payload: dict = Body(...)):
+    """文本录入：识别并纠错，便于边改文本边验证规则。"""
+    reports, warnings = _parse_manual_text(payload)
+    batch = run_batch(reports)
+    return {
+        "ok": True,
+        "source": {"type": "text", "filename": "手工输入", "format": "txt"},
+        "warnings": warnings,
+        "reports": reports,
+        **batch,
+    }
+
+
 @app.post("/api/export")
 def export_batch(payload: dict = Body(...)):
     """导出纠错结果为 Excel（两个 Sheet：质控概览 + 错误明细）。
