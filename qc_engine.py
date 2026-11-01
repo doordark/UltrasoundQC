@@ -30,7 +30,10 @@ Windows 环境（Win7/Win10, 32/64 位）设计，可由 PyInstaller 打包为�
     F 完整性与书写规范: 检查项目缺失 / 建议缺时间数值 / 数值粘连 / 项目与内容不符
     G 性别与检查项目冲突: 患者性别与检查项目/所见部位矛盾（男见子宫卵巢、女见前列腺）
     H 所见遗漏检查部位: 检查项目要求多个部位（如肝胆胰脾），所见缺少部分器官描述
-    I 数据与单位异常  : 测量值单位错误/缺失、未删测量值占位符、径线量纲异常（疑似小数点错）
+    I 数据与单位异常  : 测量值单位错误/缺失、未删测量值占位符、径线量纲异常（疑似小数点错）、
+                       数值残缺（小数点后缺数字，如"约0.cm"）、
+                       只有单位没有数值（如"大者约cm"）、只有数值没有单位（如"厚约2.5，"）、
+                       同一测量值单位混用（如"1.2mm×0.5cm"）、结节类病灶 mm 数值过小疑应为 cm
     J 语句重复        : 叠词重复（如"大小大小"）/ 整句模板重复冗余未删除；
                        模板占位符残留（"*侧""*个""mm×mm""低回声/高回声/强回声"等）；
                        与报告无关的杂字混入正文（如"卡了""待删"）；
@@ -52,7 +55,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from xml.sax.saxutils import escape
 
-ENGINE_VERSION = "1.3.2"
+ENGINE_VERSION = "1.3.5"
 MAX_BODY_BYTES = 8 * 1024 * 1024  # HTTP 请求体上限 8MB
 
 # ============================ 质控规则（9 类错误类型，名称不可改动） ============================
@@ -85,6 +88,8 @@ CHECK_ERROR_TYPE = {
     "H": ERR_MISSING_PART,
     "I": ERR_DATA_UNIT, "I1": ERR_DATA_UNIT, "I2": ERR_DATA_UNIT, "I3": ERR_DATA_UNIT,
     "I4": ERR_DATA_UNIT, "I5": ERR_DATA_UNIT, "I6": ERR_DATA_UNIT, "I7": ERR_DATA_UNIT,
+    "I8": ERR_DATA_UNIT, "I9": ERR_DATA_UNIT, "I10": ERR_DATA_UNIT,
+    "I11": ERR_DATA_UNIT, "I12": ERR_DATA_UNIT,
     "J1": ERR_WORDING, "J2": ERR_TEMPLATE_LEFT, "J3": ERR_TEMPLATE_LEFT,
     "J4": ERR_TEMPLATE_LEFT, "J5": ERR_TEMPLATE_LEFT, "J6": ERR_OTHER,
     "J7": ERR_WORDING,
@@ -309,6 +314,24 @@ BAD_UNIT_RE = re.compile(r"\d\s*[mM](?!\s*/|eter|[a-zA-Z])")
 PLACEHOLDER_MEASURE_RE = re.compile(
     r"(?:约|大小)\s*[*x×X]\s*(?:cm|mm|m)?(?![a-zA-Z\d])|(?:约|大小)\s*[xX]\s*(?:cm|mm)(?![a-zA-Z])",
     re.IGNORECASE)
+# 规则 I8 数值残缺：小数点后缺数字（"大者约0.cm" 应为 0.6cm）
+INCOMPLETE_DECIMAL_RE = re.compile(r"(?<![\d.])\d+\s*\.\s*(?:cm|mm|m)(?![a-zA-Z])")
+# 规则 I9 只有单位没有数值（"大者约cm" / "内径约mm" 应为 0.6cm）
+UNIT_ONLY_RE = re.compile(
+    r"(?:大小|测及|内径|厚径|长径|前后径|直径|深度|深径|厚度|厚|长约|长|宽约|宽|高约|高|径|约)"
+    r"\s*[约]?\s*[×*xX]?\s*(cm|mm|m)(?![a-zA-Z/])")
+# 规则 I9 乘号后缺数值（"大小约1.2*cm"）
+AXIS_UNIT_ONLY_RE = re.compile(r"\d+(?:\.\d+)?\s*[×*xX]\s*(cm|mm)(?![a-zA-Z/])")
+# 规则 I10 只有数值没有单位：单个径线数值后直接接标点/换行（"厚约2.5，" 应为 2.5cm）
+NUM_SINGLE_NO_UNIT_RE = re.compile(
+    r"(?:大小|测及|内径|厚径|长径|前后径|直径|深度|深径|厚度|厚|长约|长|宽约|宽|高约|高|径)"
+    r"\s*[约]?\s*\d+(?:\.\d+)?(?![×*xX\d.])\s*(?=[，。；、,;）)\n]|$)")
+# 规则 I11 同一测量值各径线单位混用（"1.2mm×0.5cm"）
+AXIS_SEQ_MEASURE_RE = re.compile(
+    r"(?<![\d.])(\d+(?:\.\d+)?)\s*(mm|cm|m)"
+    r"(?:\s*[×*xX]\s*(\d+(?:\.\d+)?)\s*(mm|cm|m)){1,2}(?![a-zA-Z])")
+# 规则 I12 结节类病灶 mm 数值过小，疑似单位应为 cm（"1.2mm 结节" 应为 1.2cm）
+LESION_CONTEXT_RE = re.compile(r"结节|肿块|团块|占位|包块|囊肿|病灶|肿瘤|瘤")
 
 # 规则 J 语句重复
 DUP_WORD_RE = re.compile(r"([一-龥]{2,4})\1")            # 叠词重复（"大小大小"）
@@ -1368,6 +1391,9 @@ def rule_i_measurement(parsed: dict, rules: dict) -> list:
     ratio_th = float(mr.get("ratio_threshold", 6))
     min_largest = float(mr.get("min_largest_cm", 5))
     min_lesion_mm = float(mr.get("min_lesion_mm", 1.0))
+    # 模板占位符（如"厚度mm"）由规则 J5 报出，I9 不重复报
+    tp = rules.get("template_placeholders") or DEFAULT_RULES["template_placeholders"]
+    empty_tokens = {re.sub(r"\s+", "", t).lower() for t in tp.get("empty_measure_tokens", [])}
     issues = []
     seen_bad = set()
 
@@ -1466,6 +1492,69 @@ def rule_i_measurement(parsed: dict, rules: dict) -> list:
                            f"低于超声可测范围，疑似单位误录（应为 cm）",
                 "suggestion": f"请核对测量单位：此类小数径线通常以 cm 记录（如 {num_part}cm）",
             })
+
+        # I8 数值残缺：小数点后缺少数字（"大者约0.cm" 应为 0.6cm）
+        for m in INCOMPLETE_DECIMAL_RE.finditer(text):
+            issues.append({
+                "rule_id": "I", "check": "I8", "rule": "数据与单位异常", "severity": "high",
+                "field": field, "fragment": clip(text[max(0, m.start() - 8):m.end() + 4]),
+                "message": f"测量值“{m.group(0)}”小数点后缺少数字，数值不完整（疑似录入丢字）",
+                "suggestion": "请核对并补齐小数点后的数值（如 0.cm → 0.6cm）",
+            })
+
+        # I9 只有单位没有数值（"大者约cm" / "内径约mm"）
+        for m in UNIT_ONLY_RE.finditer(text):
+            frag = m.group(0).strip()
+            if re.sub(r"\s+", "", frag).lower() in empty_tokens:
+                continue  # 模板占位符（如"厚度mm"），已由规则 J5 报出
+            issues.append({
+                "rule_id": "I", "check": "I9", "rule": "数据与单位异常", "severity": "high",
+                "field": field, "fragment": clip(text[max(0, m.start() - 8):m.end() + 4]),
+                "message": f"测量项“{frag}”只有单位“{m.group(1)}”而缺少数值",
+                "suggestion": f"请补充测量数值（如 {frag} → 0.6{m.group(1)}）",
+            })
+        # I9 乘号后缺数值（"大小约1.2*cm"）
+        for m in AXIS_UNIT_ONLY_RE.finditer(text):
+            issues.append({
+                "rule_id": "I", "check": "I9", "rule": "数据与单位异常", "severity": "high",
+                "field": field, "fragment": clip(text[max(0, m.start() - 8):m.end() + 4]),
+                "message": f"测量值“{m.group(0)}”乘号后缺少数值（仅有单位“{m.group(1)}”）",
+                "suggestion": f"请补齐乘号后的数值（如 1.2*{m.group(1)} → 1.2*0.6{m.group(1)}）",
+            })
+
+        # I10 只有数值没有单位（"厚约2.5，" 应为 2.5cm）
+        for m in NUM_SINGLE_NO_UNIT_RE.finditer(text):
+            issues.append({
+                "rule_id": "I", "check": "I10", "rule": "数据与单位异常", "severity": "medium",
+                "field": field, "fragment": clip(text[max(0, m.start() - 8):m.end() + 4]),
+                "message": f"测量值“{m.group(0)}”缺少单位（应注明 mm 或 cm）",
+                "suggestion": "请为测量值补充单位（径线通常以 mm/cm 记录）",
+            })
+
+        # I11 同一测量值混用单位（"1.2mm×0.5cm"）；I12 结节 mm 数值过小（"1.2mm" 疑为 1.2cm）
+        for m in AXIS_SEQ_MEASURE_RE.finditer(text):
+            axes = re.findall(r"(\d+(?:\.\d+)?)\s*(mm|cm|m)", m.group(0))
+            units = [u.lower() for _, u in axes]
+            if len(set(units)) > 1:
+                issues.append({
+                    "rule_id": "I", "check": "I11", "rule": "数据与单位异常", "severity": "high",
+                    "field": field, "fragment": clip(text[max(0, m.start() - 6):m.end() + 4]),
+                    "message": f"同一测量值“{m.group(0)}”各径线单位混用（{'/'.join(units)}），单位不一致",
+                    "suggestion": "请统一同一测量值的单位后核对数值（如统一为 cm）",
+                })
+            ctx = text[max(0, m.start() - 12):m.end() + 16]
+            if LESION_CONTEXT_RE.search(ctx):
+                small = [v for v, u in axes
+                         if u.lower() == "mm" and "." in v and min_lesion_mm <= float(v) < 3.0]
+                if small:
+                    issues.append({
+                        "rule_id": "I", "check": "I12", "rule": "数据与单位异常", "severity": "high",
+                        "field": field, "fragment": clip(text[max(0, m.start() - 6):m.end() + 6]),
+                        "message": f"病灶径线“{m.group(0)}”中 {small[0]}mm 数值过小，"
+                                   f"结节类病灶疑似单位误录为 mm（应为 cm）",
+                        "suggestion": f"请核对单位：{small[0]}mm 疑似应为 {small[0]}cm"
+                                      f"（如 1.2cm×0.5cm）",
+                    })
     return issues
 
 
@@ -2273,6 +2362,58 @@ _SELFTEST_CASES = [
                  "管腔无明显狭窄。\n"
                  "超声提示：左侧颈动脉斑块形成。\n"),
         "expect_rules": {"语病或表述不规范"},
+    },
+    {
+        "name": "用例39-数值残缺小数点后缺位(I8)→数据或单位错误",
+        "text": ("检查项目：泌尿系彩超\n性别：男 年龄：60岁\n"
+                 "超声所见：双肾大小形态正常，包膜完整，实质回声均匀。左肾内探及多枚强回声，"
+                 "大者约0.cm，后伴声影。\n"
+                 "超声提示：双肾小结晶。\n"),
+        "expect_rules": {"数据或单位错误"},
+    },
+    {
+        "name": "用例40-正常小数测量值不误报(I8 误报回归)",
+        "text": ("检查项目：甲状腺超声\n性别：女 年龄：45岁\n"
+                 "超声所见：甲状腺右叶见低回声结节，大小约0.8*0.6cm，边界清晰，形态规则。\n"
+                 "超声提示：甲状腺右叶结节。\n"),
+        "expect_rules": set(),
+    },
+    {
+        "name": "用例41-只有单位没有数值(I9)→数据或单位错误",
+        "text": ("检查项目：泌尿系彩超\n性别：男 年龄：60岁\n"
+                 "超声所见：双肾大小形态正常，包膜完整，实质回声均匀，集合系未见分离；"
+                 "左肾内探及多枚强回声，大者约cm，后伴声影。\n"
+                 "超声提示：双肾小结晶。\n"),
+        "expect_rules": {"数据或单位错误"},
+    },
+    {
+        "name": "用例42-只有数值没有单位(I10)→数据或单位错误",
+        "text": ("检查项目：甲状腺超声\n性别：女 年龄：45岁\n"
+                 "超声所见：甲状腺右叶见低回声结节，大小约2.5，边界清晰，形态规则。\n"
+                 "超声提示：甲状腺右叶结节。\n"),
+        "expect_rules": {"数据或单位错误"},
+    },
+    {
+        "name": "用例43-正常单位与乘号后数值不误报(I9/I10 误报回归)",
+        "text": ("检查项目：甲状腺超声\n性别：女 年龄：45岁\n"
+                 "超声所见：甲状腺右叶见低回声结节，大小约2.5*1.6cm；"
+                 "甲状腺左叶内径约3.0mm，实质回声均匀。\n"
+                 "超声提示：甲状腺右叶结节。\n"),
+        "expect_rules": set(),
+    },
+    {
+        "name": "用例44-同一测量值单位混用(I11)+结节mm过小(I12)→数据或单位错误",
+        "text": ("检查项目：甲状腺彩超\n性别：女 年龄：44岁\n"
+                 "超声所见：甲状腺右叶见一大小约1.2mm×0.5cm低回声结节，边界清，形态规则。\n"
+                 "超声提示：甲状腺右叶结节（C-TIRADS 3类）。\n"),
+        "expect_rules": {"数据或单位错误"},
+    },
+    {
+        "name": "用例45-统一 cm 单位不误报(I11/I12 误报回归)",
+        "text": ("检查项目：甲状腺彩超\n性别：女 年龄：44岁\n"
+                 "超声所见：甲状腺右叶见一大小约1.2cm×0.5cm低回声结节，边界清，形态规则。\n"
+                 "超声提示：甲状腺右叶结节（C-TIRADS 3类）。\n"),
+        "expect_rules": set(),
     },
 ]
 
